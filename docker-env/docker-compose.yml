@@ -105,6 +105,22 @@ services:
         condition: service_started
     restart: unless-stopped
 
+  # ==================== Ollama ====================
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
   # ==================== RustFS ====================
   rustfs:
     image: rustfs/rustfs:1.0.0-alpha.72
@@ -124,6 +140,7 @@ services:
 volumes:
   pgdata:
   rustfs-data:
+  ollama-data:
 
 networks:
   rocketmq:
