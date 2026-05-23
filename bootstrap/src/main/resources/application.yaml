@@ -7,6 +7,9 @@ spring:
   application:
     name: ragent${unique-name:}-service
 
+  config:
+    import: optional:classpath:application-local.yaml
+
   servlet:
     multipart:
       max-file-size: 50MB
