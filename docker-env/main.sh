@@ -6,7 +6,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "=== 启动 Docker 中间件 ==="
 cd "$SCRIPT_DIR"
-docker compose down -v
+docker compose down
 docker compose up -d
 
 echo "=== 等待 PostgreSQL 就绪 ==="
