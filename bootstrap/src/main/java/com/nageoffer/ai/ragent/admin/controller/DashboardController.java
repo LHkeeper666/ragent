@@ -17,8 +17,11 @@
 
 package com.nageoffer.ai.ragent.admin.controller;
 
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardCoverageVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardOverviewVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardPerformanceVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardRetrievalHitRateVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTopQuestionsVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTrendsVO;
 import com.nageoffer.ai.ragent.admin.service.DashboardService;
 import com.nageoffer.ai.ragent.framework.convention.Result;
@@ -51,5 +54,21 @@ public class DashboardController {
                                             @RequestParam(required = false) String window,
                                             @RequestParam(required = false) String granularity) {
         return Results.success(dashboardService.loadTrends(metric, window, granularity));
+    }
+
+    @GetMapping("/retrieval-hit-rate")
+    public Result<DashboardRetrievalHitRateVO> retrievalHitRate(@RequestParam(required = false) String window) {
+        return Results.success(dashboardService.loadRetrievalHitRate(window));
+    }
+
+    @GetMapping("/coverage")
+    public Result<DashboardCoverageVO> coverage(@RequestParam(required = false) String window) {
+        return Results.success(dashboardService.loadCoverage(window));
+    }
+
+    @GetMapping("/top-questions")
+    public Result<DashboardTopQuestionsVO> topQuestions(@RequestParam(required = false) String window,
+                                                        @RequestParam(required = false, defaultValue = "10") Integer limit) {
+        return Results.success(dashboardService.loadTopQuestions(window, limit));
     }
 }

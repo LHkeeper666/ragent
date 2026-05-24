@@ -19,6 +19,66 @@ package com.nageoffer.ai.ragent.rag.dao.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.nageoffer.ai.ragent.rag.dao.entity.ConversationMessageDO;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
 
 public interface ConversationMessageMapper extends BaseMapper<ConversationMessageDO> {
+
+    @Select("select left(um.content, 100) as question, "
+            + "count(*) as frequency, "
+            + "max(um.create_time) as lastSeen "
+            + "from t_message um "
+            + "where um.role = 'user' "
+            + "and um.deleted = 0 "
+            + "and um.create_time >= #{start} "
+            + "and um.create_time < #{end} "
+            + "and exists ("
+            + "  select 1 from t_message am "
+            + "  where am.conversation_id = um.conversation_id "
+            + "  and am.role = 'assistant' "
+            + "  and am.content = #{noDocReply} "
+            + "  and am.deleted = 0 "
+            + "  and am.create_time > um.create_time"
+            + ") "
+            + "group by left(um.content, 100) "
+            + "order by frequency desc "
+            + "limit #{limit}")
+    List<Map<String, Object>> findBlindSpots(@Param("start") Date start,
+                                             @Param("end") Date end,
+                                             @Param("noDocReply") String noDocReply,
+                                             @Param("limit") int limit);
+
+    @Select("select left(um.content, 100) as question, "
+            + "count(*) as cnt, "
+            + "sum(case when coalesce((select am.content from t_message am "
+            + "  where am.conversation_id = um.conversation_id "
+            + "  and am.role = 'assistant' and am.deleted = 0 "
+            + "  and am.create_time > um.create_time "
+            + "  order by am.create_time asc limit 1), '') != #{noDocReply} then 1 else 0 end) as hits, "
+            + "(select count(*) from t_message_feedback f "
+            + "  join t_message am on am.id = f.message_id "
+            + "  where am.conversation_id = um.conversation_id "
+            + "  and am.role = 'assistant' and am.deleted = 0 "
+            + "  and f.deleted = 0) as feedbackCount, "
+            + "(select count(*) from t_message_feedback f "
+            + "  join t_message am on am.id = f.message_id "
+            + "  where am.conversation_id = um.conversation_id "
+            + "  and am.role = 'assistant' and am.deleted = 0 "
+            + "  and f.deleted = 0 and f.vote = 1) as thumbsUp "
+            + "from t_message um "
+            + "where um.role = 'user' "
+            + "and um.deleted = 0 "
+            + "and um.create_time >= #{start} "
+            + "and um.create_time < #{end} "
+            + "group by left(um.content, 100) "
+            + "order by cnt desc "
+            + "limit #{limit}")
+    List<Map<String, Object>> findTopQuestions(@Param("start") Date start,
+                                               @Param("end") Date end,
+                                               @Param("limit") int limit,
+                                               @Param("noDocReply") String noDocReply);
 }

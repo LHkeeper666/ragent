@@ -17,8 +17,11 @@
 
 package com.nageoffer.ai.ragent.admin.service;
 
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardCoverageVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardOverviewVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardPerformanceVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardRetrievalHitRateVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTopQuestionsVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTrendsVO;
 
 public interface DashboardService {
@@ -28,4 +31,10 @@ public interface DashboardService {
     DashboardPerformanceVO loadPerformance(String window);
 
     DashboardTrendsVO loadTrends(String metric, String window, String granularity);
+
+    DashboardRetrievalHitRateVO loadRetrievalHitRate(String window);
+
+    DashboardCoverageVO loadCoverage(String window);
+
+    DashboardTopQuestionsVO loadTopQuestions(String window, Integer limit);
 }
