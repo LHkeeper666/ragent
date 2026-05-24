@@ -125,6 +125,12 @@ public class IntentNode {
     private String paramPromptTemplate;
 
     /**
+     * 增强回答模式：知识库检索不足时，是否启用联网搜索补充回答
+     */
+    @Builder.Default
+    private boolean augmented = false;
+
+    /**
      * 是否为“最终节点”（叶子节点）：
      * - 叶子节点才挂知识库（Milvus Collection）
      * - 叶子节点才会参与意图匹配打分

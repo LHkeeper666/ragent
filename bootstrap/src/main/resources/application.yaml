@@ -104,6 +104,11 @@ rag:
     enabled: true
     max-error-length: 1000
 
+  websearch:
+    enabled: true       # 开启联网搜索增强
+    provider: duckduckgo  # 默认，免费无需 API Key
+    max-results: 5
+
 ai:
   providers:
     ollama:

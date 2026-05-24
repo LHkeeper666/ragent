@@ -46,6 +46,7 @@ public class IntentTreeFactory {
                 .kind(IntentKind.KB)
                 .build();
 
+        // ---- 人事 ----
         IntentNode hr = IntentNode.builder()
                 .id("group-hr")
                 .kbId(KB_ID_GROUP)
@@ -57,10 +58,33 @@ public class IntentTreeFactory {
                 .examples(List.of(
                         "请假流程是怎样的？",
                         "试用期多久转正？",
-                        "迟到会有什么处罚？"
+                        "迟到会有什么处罚？",
+                        "年假怎么申请？",
+                        "产假有多少天？"
                 ))
                 .build();
 
+        IntentNode hrPolicy = IntentNode.builder()
+                .id("group-hr-policy")
+                .kbId(KB_ID_GROUP)
+                .name("HR政策咨询")
+                .level(TOPIC)
+                .parentId(hr.getId())
+                .kind(IntentKind.KB)
+                .description("招聘政策、入职流程、转正标准、离职手续、绩效评估、薪资结构、考勤制度、年假/产假/病假等假期政策、劳动合同、员工福利")
+                .examples(List.of(
+                        "年假怎么申请？",
+                        "试用期多久转正？",
+                        "产假有多少天？",
+                        "离职手续怎么办？",
+                        "绩效考核多久一次？"
+                ))
+                .topK(8)
+                .build();
+
+        hr.setChildren(List.of(hrPolicy));
+
+        // ---- IT支持 ----
         IntentNode it = IntentNode.builder()
                 .id("group-it")
                 .kbId(KB_ID_GROUP)
@@ -76,6 +100,42 @@ public class IntentTreeFactory {
                 ))
                 .build();
 
+        IntentNode itEquip = IntentNode.builder()
+                .id("group-it-equip")
+                .kbId(KB_ID_GROUP)
+                .name("设备与网络")
+                .level(TOPIC)
+                .parentId(it.getId())
+                .kind(IntentKind.KB)
+                .description("VPN配置与连接、打印机安装与故障、邮箱账号与密码重置、无线网络连接、电脑硬件故障报修")
+                .examples(List.of(
+                        "公司 VPN 连不上怎么办？",
+                        "电脑打印机怎么连？",
+                        "邮箱密码忘了怎么重置？",
+                        "无线网络连不上怎么办？"
+                ))
+                .topK(5)
+                .build();
+
+        IntentNode itSoft = IntentNode.builder()
+                .id("group-it-soft")
+                .kbId(KB_ID_GROUP)
+                .name("软件与系统")
+                .level(TOPIC)
+                .parentId(it.getId())
+                .kind(IntentKind.KB)
+                .description("OA系统使用、ERP操作、CRM客户管理、邮箱客户端配置、Office办公软件、即时通讯工具等企业软件使用问题")
+                .examples(List.of(
+                        "OA系统怎么提交请假审批？",
+                        "Outlook邮箱怎么配置？",
+                        "企业微信怎么加入部门群？"
+                ))
+                .topK(5)
+                .build();
+
+        it.setChildren(List.of(itEquip, itSoft));
+
+        // ---- 财务 ----
         IntentNode finance = IntentNode.builder()
                 .id("group-finance")
                 .kbId(KB_ID_GROUP)
@@ -83,10 +143,30 @@ public class IntentTreeFactory {
                 .level(CATEGORY)
                 .parentId(group.getId())
                 .kind(IntentKind.KB)
-                .description("报销、付款、成本中心、预算等财务相关问题")
+                .description("报销、付款、成本中心、预算、发票等财务相关问题")
                 .examples(List.of(
-                        "差旅报销需要哪些资料？"
+                        "差旅报销需要哪些资料？",
+                        "怎么申请付款？",
+                        "预算怎么查询？"
                 ))
+                .build();
+
+        IntentNode financeReimburse = IntentNode.builder()
+                .id("group-finance-reimburse")
+                .kbId(KB_ID_GROUP)
+                .name("报销流程")
+                .level(TOPIC)
+                .parentId(finance.getId())
+                .kind(IntentKind.KB)
+                .description("差旅报销、招待费报销、日常费用报销的申请流程与所需材料")
+                .examples(List.of(
+                        "差旅报销需要哪些资料？",
+                        "招待费怎么报销？",
+                        "报销审批流程是怎样的？"
+                ))
+                .topK(8)
+                .augmented(true)
+                .promptTemplate(REIMBURSE_PROMPT_TEMPLATE)
                 .build();
 
         IntentNode financeInvoice = IntentNode.builder()
@@ -103,9 +183,57 @@ public class IntentTreeFactory {
                 .promptTemplate(FINANCE_INVOICE_PROMPT_TEMPLATE)
                 .build();
 
-        finance.setChildren(List.of(financeInvoice));
+        finance.setChildren(List.of(financeReimburse, financeInvoice));
 
-        group.setChildren(List.of(hr, it, finance));
+        // ---- 行政服务 ----
+        IntentNode admin = IntentNode.builder()
+                .id("group-admin")
+                .kbId(KB_ID_GROUP)
+                .name("行政服务")
+                .level(CATEGORY)
+                .parentId(group.getId())
+                .kind(IntentKind.KB)
+                .description("会议室预约、办公用品申领、门禁卡办理、访客登记、快递收发、固定资产管理等行政相关服务")
+                .examples(List.of(
+                        "怎么预约会议室？",
+                        "办公用品怎么申领？",
+                        "门禁卡丢了怎么办？"
+                ))
+                .build();
+
+        IntentNode adminMeeting = IntentNode.builder()
+                .id("group-admin-meeting")
+                .kbId(KB_ID_GROUP)
+                .name("会议室管理")
+                .level(TOPIC)
+                .parentId(admin.getId())
+                .kind(IntentKind.KB)
+                .description("会议室预约流程、使用规则、设备配置、取消与变更")
+                .examples(List.of(
+                        "怎么预约会议室？",
+                        "会议室有哪些设备？"
+                ))
+                .topK(5)
+                .build();
+
+        IntentNode adminSupply = IntentNode.builder()
+                .id("group-admin-supply")
+                .kbId(KB_ID_GROUP)
+                .name("办公用品申领")
+                .level(TOPIC)
+                .parentId(admin.getId())
+                .kind(IntentKind.KB)
+                .description("办公用品申领流程、申领标准、库存查询")
+                .examples(List.of(
+                        "办公用品怎么申领？",
+                        "申领办公用品有额度限制吗？"
+                ))
+                .topK(5)
+                .build();
+
+        admin.setChildren(List.of(adminMeeting, adminSupply));
+
+        group.setChildren(List.of(hr, it, finance, admin));
         roots.add(group);
 
         // ========== 2. 业务系统 ==========
@@ -350,6 +478,30 @@ public class IntentTreeFactory {
             【文档内容】
             %s
             
+            【用户问题】
+            %s
+            """;
+
+    private static final String REIMBURSE_PROMPT_TEMPLATE = """
+            你是专业的企业报销流程助手，现在根据【文档内容】回答用户关于报销的问题。
+
+            请严格遵守以下规则：
+
+            【回答规则】
+            1. 严格基于【文档内容】回答，不得虚构任何报销政策、流程或金额
+            2. 报销流程按步骤顺序展开，每一步说明需要做什么、找谁审批、需要什么材料
+            3. 涉及金额限制、时间节点时，必须标注具体数字和单位
+            4. 文档未提供的详细信息，明确说明"文档未提供该信息，建议咨询财务部门"
+
+            【格式要求】
+            1. 先给出整体流程概览（1-2句话）
+            2. 再用 ### 一、### 二、 等三级标题展开每个步骤
+            3. 每个步骤下说明：操作内容、所需材料、审批人、注意事项
+            4. 关键金额、截止日期等用**加粗**显示
+
+            【文档内容】
+            %s
+
             【用户问题】
             %s
             """;

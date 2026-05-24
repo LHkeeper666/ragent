@@ -136,6 +136,12 @@ public class RAGConstant {
     // ==================== 上下文格式化模板（单文件多 section） ====================
 
     /**
+     * 增强回答 Prompt 模板路径
+     * 知识库检索为空时，配合联网搜索结果使用的回答模板
+     */
+    public static final String RAG_AUGMENTED_PROMPT_PATH = "prompt/answer-chat-kb-augmented.st";
+
+    /**
      * 上下文格式化模板文件路径
      * <p>
      * 包含所有上下文格式化所需的 section，通过 {@code --- section: name ---} 分隔，
