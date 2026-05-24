@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Check, FileUp, PlayCircle, RefreshCw, Trash2, Pencil, FileBarChart, X, Eye, MoreHorizontal, FileText, Link as LinkIcon } from "lucide-react";
+import { Check, FileUp, Image, PlayCircle, RefreshCw, Trash2, Pencil, FileBarChart, X, Eye, MoreHorizontal, FileText, Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
@@ -17,6 +17,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RelativeTime } from "@/components/RelativeTime";
 import { formatFullDateTime } from "@/utils/time";
 
@@ -108,6 +109,40 @@ const formatSourceLabel = (sourceType?: string | null) => {
   return "-";
 };
 
+const ProcessModeCell = ({ doc, pipelineMap }: { doc: KnowledgeDocument; pipelineMap: Map<string, string> }) => {
+  const mode = doc.processMode?.toLowerCase();
+  if (mode === "chunk") {
+    const detail = doc.chunkStrategy ? formatChunkStrategy(doc.chunkStrategy) : null;
+    const trigger = <span className="cursor-default text-sm">Chunk</span>;
+    if (!detail) return trigger;
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipContent><p>策略：{detail}</p></TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  if (mode === "pipeline") {
+    const pid = doc.pipelineId ? String(doc.pipelineId) : null;
+    const name = pid ? pipelineMap.get(pid) : null;
+    return (
+      <TooltipProvider delayDuration={300}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="cursor-default text-sm">Data Pipeline</span>
+          </TooltipTrigger>
+          {name ? (
+            <TooltipContent><p>{name}</p></TooltipContent>
+          ) : null}
+        </Tooltip>
+      </TooltipProvider>
+    );
+  }
+  return <span className="text-muted-foreground/35 text-sm">-</span>;
+};
+
 const formatChunkStrategy = (strategy?: string | null) => {
   const normalized = strategy?.toLowerCase();
   if (normalized === "fixed_size") return "固定大小";
@@ -115,13 +150,28 @@ const formatChunkStrategy = (strategy?: string | null) => {
   return strategy || "-";
 };
 
+const FILE_TYPE_MAP: Record<string, { icon: typeof FileText; color: string }> = {
+  pdf:         { icon: FileText, color: "text-red-500" },
+  markdown:    { icon: FileText, color: "text-blue-500" },
+  md:          { icon: FileText, color: "text-blue-500" },
+  doc:         { icon: FileText, color: "text-blue-600" },
+  docx:        { icon: FileText, color: "text-blue-600" },
+  txt:         { icon: FileText, color: "text-slate-500" },
+  csv:         { icon: FileText, color: "text-emerald-500" },
+  image:       { icon: Image,   color: "text-emerald-500" },
+  png:         { icon: Image,   color: "text-emerald-500" },
+  jpg:         { icon: Image,   color: "text-emerald-500" },
+  jpeg:        { icon: Image,   color: "text-emerald-500" },
+  gif:         { icon: Image,   color: "text-emerald-500" },
+  webp:        { icon: Image,   color: "text-emerald-500" },
+  svg:         { icon: Image,   color: "text-emerald-500" },
+};
+
 const renderFileTypeIcon = (fileType?: string | null, sourceType?: string | null) => {
   const type = fileType?.toLowerCase();
-  if (type === "pdf") {
-    return <FileText className="h-4 w-4 shrink-0 text-red-500" />;
-  }
-  if (type === "markdown" || type === "md") {
-    return <FileText className="h-4 w-4 shrink-0 text-blue-500" />;
+  if (type && FILE_TYPE_MAP[type]) {
+    const { icon: Icon, color } = FILE_TYPE_MAP[type];
+    return <Icon className={`h-4 w-4 shrink-0 ${color}`} />;
   }
   if (sourceType?.toLowerCase() === "url") {
     return <LinkIcon className="h-4 w-4 shrink-0 text-purple-500" />;
@@ -164,9 +214,18 @@ export function KnowledgeDocumentsPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
 
   const documents = pageData?.records || [];
+  const [pipelineMap, setPipelineMap] = useState<Map<string, string>>(new Map());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchOperating, setBatchOperating] = useState(false);
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+
+  useEffect(() => {
+    getIngestionPipelines(1, 200).then(r => {
+      const map = new Map<string, string>();
+      (r.records || []).forEach(p => map.set(String(p.id), p.name));
+      setPipelineMap(map);
+    }).catch(() => {});
+  }, []);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -586,7 +645,8 @@ export function KnowledgeDocumentsPage() {
                     <TableHead className="w-[110px]">状态</TableHead>
                     <TableHead className="w-[70px]">启用</TableHead>
                     <TableHead className="w-[80px]">分块数</TableHead>
-                    <TableHead className="w-[180px]">更新时间</TableHead>
+                    <TableHead className="w-[120px]">处理模式</TableHead>
+                    <TableHead className="w-[170px]">更新时间</TableHead>
                     <TableHead className="w-[170px] text-left">操作</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -606,7 +666,7 @@ export function KnowledgeDocumentsPage() {
                           <div className="flex items-center gap-1.5 min-w-0">
                             <button
                               type="button"
-                              className="block truncate min-w-0 text-left font-medium text-indigo-600 transition-colors hover:text-indigo-700 hover:underline underline-offset-4"
+                              className="block truncate min-w-0 text-left font-medium text-slate-900 transition-colors hover:text-indigo-600 hover:underline underline-offset-4"
                               title={doc.docName || ""}
                               onClick={() => navigate(`/admin/knowledge/${kbId}/docs/${doc.id}`)}
                             >
@@ -666,8 +726,11 @@ export function KnowledgeDocumentsPage() {
                       {doc.chunkCount != null && doc.chunkCount > 0 ? (
                         <span className="tabular-nums">{doc.chunkCount}</span>
                       ) : (
-                        <span className="text-muted-foreground/35">-</span>
+                        <span className="text-muted-foreground/50">-</span>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <ProcessModeCell doc={doc} pipelineMap={pipelineMap} />
                     </TableCell>
                     <TableCell>
                       <RelativeTime value={doc.updateTime} updatedBy={doc.updatedBy} />
