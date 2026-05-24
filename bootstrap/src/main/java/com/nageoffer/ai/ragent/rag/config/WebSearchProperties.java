@@ -35,12 +35,13 @@ public class WebSearchProperties {
     private boolean enabled = false;
 
     /**
-     * 搜索引擎：duckduckgo / serpapi / bing
+     * 搜索引擎：tavily / duckduckgo
+     * tavily 需要配置 apiKey，未配置时自动降级到 duckduckgo
      */
     private String provider = "duckduckgo";
 
     /**
-     * API Key（SerpAPI / Bing 需要）
+     * API Key（Tavily 需要，DuckDuckGo 不需要）
      */
     private String apiKey;
 

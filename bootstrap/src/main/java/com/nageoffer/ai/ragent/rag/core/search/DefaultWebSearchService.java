@@ -38,12 +38,14 @@ import java.util.List;
 
 /**
  * 联网搜索默认实现
- * 支持 DuckDuckGo Instant Answer API（免费无需 API Key）
+ * 支持 Tavily Search API（推荐）和 DuckDuckGo Instant Answer API（免费兜底）
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DefaultWebSearchService implements WebSearchService {
+
+    private static final String TAVILY_API_URL = "https://api.tavily.com/search";
 
     private final WebSearchProperties properties;
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -53,11 +55,76 @@ public class DefaultWebSearchService implements WebSearchService {
     @Override
     public List<WebSearchResult> search(String query, int maxResults) {
         String provider = properties.getProvider();
+        String apiKey = properties.getApiKey();
+
+        if ("tavily".equalsIgnoreCase(provider)) {
+            if (apiKey != null && !apiKey.isBlank()) {
+                return searchTavily(query, maxResults, apiKey);
+            }
+            log.info("Tavily 未配置 apiKey，降级使用 DuckDuckGo");
+            return searchDuckDuckGo(query, maxResults);
+        }
+
         if ("duckduckgo".equalsIgnoreCase(provider)) {
             return searchDuckDuckGo(query, maxResults);
         }
+
         log.warn("不支持的搜索引擎: {}", provider);
         return Collections.emptyList();
+    }
+
+    private List<WebSearchResult> searchTavily(String query, int maxResults, String apiKey) {
+        try {
+            JSONObject body = JSONUtil.createObj();
+            body.set("api_key", apiKey);
+            body.set("query", query);
+            body.set("search_depth", "basic");
+            body.set("max_results", Math.min(maxResults, 10));
+            body.set("include_answer", true);
+
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(TAVILY_API_URL))
+                    .header("Content-Type", "application/json")
+                    .timeout(Duration.ofSeconds(15))
+                    .POST(HttpRequest.BodyPublishers.ofString(body.toString()))
+                    .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.warn("Tavily 搜索失败，HTTP {}: {}", response.statusCode(), response.body());
+                return Collections.emptyList();
+            }
+            return parseTavilyResponse(response.body(), maxResults);
+        } catch (Exception e) {
+            log.error("Tavily 搜索异常", e);
+            return Collections.emptyList();
+        }
+    }
+
+    private List<WebSearchResult> parseTavilyResponse(String body, int maxResults) {
+        JSONObject json = JSONUtil.parseObj(body);
+        List<WebSearchResult> results = new ArrayList<>();
+
+        // answer: Tavily 的总结性回答
+        String answer = json.getStr("answer");
+        if (answer != null && !answer.isBlank()) {
+            results.add(new WebSearchResult("AI 总结", "", answer));
+        }
+
+        // results: 详细搜索结果
+        JSONArray items = json.getJSONArray("results");
+        if (items != null && !items.isEmpty()) {
+            for (int i = 0; i < items.size() && results.size() < maxResults + 1; i++) {
+                JSONObject item = items.getJSONObject(i);
+                String title = item.getStr("title");
+                String url = item.getStr("url");
+                String content = item.getStr("content");
+                if (title != null && content != null) {
+                    results.add(new WebSearchResult(title, url != null ? url : "", content));
+                }
+            }
+        }
+
+        return results;
     }
 
     private List<WebSearchResult> searchDuckDuckGo(String query, int maxResults) {
