@@ -117,11 +117,6 @@ public class IntentNodeDO {
     private String paramPromptTemplate;
 
     /**
-     * 增强回答模式：知识库检索不足时，是否启用联网搜索补充回答
-     */
-    private Integer augmented;
-
-    /**
      * 是否启用
      */
     private Integer enabled;

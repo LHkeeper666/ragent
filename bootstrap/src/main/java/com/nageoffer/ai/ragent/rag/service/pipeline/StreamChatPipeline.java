@@ -169,23 +169,13 @@ public class StreamChatPipeline {
         if (!retrievalCtx.isEmpty()) {
             return false;
         }
-        if (hasAugmentedIntent(ctx) && webSearchProperties.isEnabled()) {
+        if (webSearchProperties.isEnabled()) {
             return handleAugmentedSearch(ctx);
         }
         StreamCallback callback = ctx.getCallback();
         callback.onContent("未检索到与问题相关的文档内容。");
         callback.onComplete();
         return true;
-    }
-
-    private boolean hasAugmentedIntent(StreamChatContext ctx) {
-        List<SubQuestionIntent> subIntents = ctx.getSubIntents();
-        if (CollUtil.isEmpty(subIntents)) {
-            return false;
-        }
-        return subIntents.stream()
-                .flatMap(si -> si.nodeScores().stream())
-                .anyMatch(ns -> ns.getNode() != null && ns.getNode().isAugmented());
     }
 
     private boolean handleAugmentedSearch(StreamChatContext ctx) {

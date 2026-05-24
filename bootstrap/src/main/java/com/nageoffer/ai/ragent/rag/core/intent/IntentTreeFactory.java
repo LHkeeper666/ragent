@@ -165,7 +165,6 @@ public class IntentTreeFactory {
                         "报销审批流程是怎样的？"
                 ))
                 .topK(8)
-                .augmented(true)
                 .promptTemplate(REIMBURSE_PROMPT_TEMPLATE)
                 .build();
 
