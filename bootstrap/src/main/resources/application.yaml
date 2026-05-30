@@ -19,7 +19,7 @@ spring:
     driver-class-name: org.postgresql.Driver
     type: com.zaxxer.hikari.HikariDataSource
     username: postgres
-    password: postgres
+    password: ${DB_PASSWORD:postgres}
     url: jdbc:postgresql://127.0.0.1:5432/ragent?client_encoding=UTF8
     hikari:
       connection-timeout: 5000
@@ -33,7 +33,7 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: 123456
+      password: ${REDIS_PASSWORD:123456}
 
 rocketmq:
   name-server: 127.0.0.1:9876
@@ -106,7 +106,8 @@ rag:
 
   websearch:
     enabled: true       # 开启联网搜索增强
-    provider: duckduckgo  # 默认，免费无需 API Key
+    provider: tavily  # 默认，免费无需 API Key
+    api-key: ${TAVILY_API_KEY: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}
     max-results: 5
 
 ai:
@@ -187,8 +188,8 @@ ai:
 
 rustfs:
   url: http://localhost:9000
-  access-key-id: rustfsadmin
-  secret-access-key: rustfsadmin
+  access-key-id: ${RUSTFS_ACCESS_KEY:rustfsadmin}
+  secret-access-key: ${RUSTFS_SECRET_KEY:rustfsadmin}
 
 sa-token:
   token-name: Authorization
