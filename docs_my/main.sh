@@ -11,6 +11,6 @@ temp_docx=".\docx\template.docx"
 
 # pandoc "${file}" -o "${file%.md}.pdf" --pdf-engine=xelatex --filter pandoc-crossref
 
-pandoc "$file" --reference-doc "$temp_docx" -o ".\docx\\${file%.md}.docx"
+# pandoc "$file" --reference-doc "$temp_docx" -o ".\docx\\${file%.md}.docx"
 
-# pandoc "$file" ·
+pandoc "$file" -o "${file%.md}.pdf" --pdf-engine=xelatex
