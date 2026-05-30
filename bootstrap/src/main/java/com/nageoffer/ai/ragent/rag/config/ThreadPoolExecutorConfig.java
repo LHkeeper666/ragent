@@ -65,8 +65,8 @@ public class ThreadPoolExecutorConfig {
     @Bean
     public Executor ragContextExecutor() {
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                CPU_COUNT,
-                CPU_COUNT << 1,
+                CPU_COUNT << 2,
+                CPU_COUNT << 2,
                 60,
                 TimeUnit.SECONDS,
                 new SynchronousQueue<>(),
@@ -84,8 +84,8 @@ public class ThreadPoolExecutorConfig {
     @Bean
     public Executor ragRetrievalExecutor() {
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                CPU_COUNT,
-                CPU_COUNT << 1,
+                CPU_COUNT << 2,
+                CPU_COUNT << 2,
                 60,
                 TimeUnit.SECONDS,
                 new SynchronousQueue<>(),
