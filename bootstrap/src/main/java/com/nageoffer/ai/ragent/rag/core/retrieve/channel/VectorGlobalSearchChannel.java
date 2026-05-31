@@ -72,6 +72,11 @@ public class VectorGlobalSearchChannel implements SearchChannel {
             return false;
         }
 
+        // 意图定向检索关闭时，全局检索必须兜底，否则无通道可用
+        if (!properties.getChannels().getIntentDirected().isEnabled()) {
+            return true;
+        }
+
         List<NodeScore> allScores = context.getIntents().stream()
                 .flatMap(si -> si.nodeScores().stream())
                 .toList();
