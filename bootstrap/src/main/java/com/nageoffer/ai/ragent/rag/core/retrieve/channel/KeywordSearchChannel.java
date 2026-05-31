@@ -165,20 +165,20 @@ public class KeywordSearchChannel implements SearchChannel {
         if (sanitized.isBlank()) {
             return List.of();
         }
-        // plainto_tsquery 将输入切分为词后用 & 连接，sanitized 中的空格天然实现 AND 语义
-        // 使用带索引的 tsv 列而非实时计算 to_tsvector
+        // 将空格替换为 | 实现 OR 语义：匹配任一词即可命中
+        String tsQuery = sanitized.trim().replaceAll("\\s+", " | ");
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
         return jdbcTemplate.query(
-                "SELECT id, content, ts_rank(tsv, plainto_tsquery('zhparser', ?)) AS score " +
+                "SELECT id, content, ts_rank(tsv, to_tsquery('zhparser', ?)) AS score " +
                 "FROM t_knowledge_vector " +
-                "WHERE metadata->>'collection_name' = ? AND tsv @@ plainto_tsquery('zhparser', ?) " +
+                "WHERE metadata->>'collection_name' = ? AND tsv @@ to_tsquery('zhparser', ?) " +
                 "ORDER BY score DESC LIMIT ?",
                 (rs, rowNum) -> RetrievedChunk.builder()
                         .id(rs.getString("id"))
                         .text(rs.getString("content"))
                         .score(rs.getFloat("score"))
                         .build(),
-                sanitized, collectionName, sanitized, topK
+                tsQuery, collectionName, tsQuery, topK
         );
     }
 
