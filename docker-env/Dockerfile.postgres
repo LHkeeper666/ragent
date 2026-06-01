@@ -1,0 +1,24 @@
+FROM pgvector/pgvector:pg16
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential git wget ca-certificates postgresql-server-dev-16 \
+    && rm -rf /var/lib/apt/lists/*
+
+# 编译 SCWS (简易中文分词系统)
+RUN wget -q http://www.xunsearch.com/scws/down/scws-1.2.3.tar.bz2 \
+    && tar xf scws-1.2.3.tar.bz2 \
+    && cd scws-1.2.3 \
+    && ./configure && make && make install \
+    && cd .. && rm -rf scws-1.2.3*
+
+# 确保 SCWS 词典在 zhparser 期望的路径
+RUN wget -q https://github.com/amutu/zhparser/raw/master/dict.utf8.xdb \
+    -O /usr/local/share/dict.utf8.xdb
+
+# 编译 zhparser
+RUN git clone https://github.com/amutu/zhparser.git \
+    && cd zhparser \
+    && make && make install \
+    && cd .. && rm -rf zhparser
+
+RUN ldconfig
