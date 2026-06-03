@@ -1,0 +1,40 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam componentBorderColor #4A90D9
+skinparam componentBackgroundColor #E8F0FE
+skinparam arrowColor #333333
+
+title Multi-Channel Retrieval Architecture
+
+component "MultiChannelRetrievalEngine" as Engine
+
+component "VectorGlobalSearchChannel\n(Vector Semantic)" as Vector
+component "IntentDirectedSearchChannel\n(Intent-Directed)" as Intent
+component "KeywordSearchChannel\n(Keyword Full-Text) [NEW]" as Keyword #90EE90
+
+component "Post-Processor Chain" as PostChain {
+    component "HybridFusionPostProcessor\n(RRF / WeightedSum) [NEW]" as Fusion #90EE90
+    component "DeduplicationPostProcessor\n(Text Dedup)" as Dedup
+    component "RerankPostProcessor\n(Re-rank)" as Rerank
+}
+
+database "PostgreSQL\n+ pgvector" as PGV
+database "PostgreSQL\n+ zhparser" as PGZ #90EE90
+
+Engine -down-> Vector : parallel
+Engine -down-> Intent : parallel
+Engine -down-> Keyword : parallel
+
+Vector -down-> PGV : vector search
+Intent -down-> PGV : vector search
+Keyword -down-> PGZ : full-text search
+
+Vector --> Fusion : results
+Intent --> Fusion : results
+Keyword --> Fusion : results
+
+Fusion --> Dedup
+Dedup --> Rerank
+Rerank --> Engine
+
+@enduml
