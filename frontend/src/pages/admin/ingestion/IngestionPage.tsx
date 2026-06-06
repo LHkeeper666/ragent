@@ -57,6 +57,12 @@ const STATUS_OPTIONS = [
   { value: "failed", label: "failed" }
 ];
 
+const PRIORITY_OPTIONS = [
+  { value: "high", label: "high" },
+  { value: "medium", label: "medium" },
+  { value: "low", label: "low" }
+];
+
 const SOURCE_OPTIONS = [
   { value: "file", label: "Local File" },
   { value: "url", label: "Remote URL" },
@@ -96,6 +102,21 @@ const formatDate = (value?: string | null) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleString("zh-CN");
+};
+
+const formatSize = (size?: number | null) => {
+  if (!size && size !== 0) return "-";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  if (size < 1024 * 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+  return `${(size / 1024 / 1024 / 1024).toFixed(1)} GB`;
+};
+
+const formatQueueInfo = (task: IngestionTask) => {
+  if (task.queueStatus === "queued") {
+    return task.queuePosition ? `#${task.queuePosition}` : "queued";
+  }
+  return task.queueStatus || "-";
 };
 
 const stringifyJson = (value: unknown) => {
@@ -230,6 +251,7 @@ export function IngestionPage() {
 
   const [taskPage, setTaskPage] = useState<PageResult<IngestionTask> | null>(null);
   const [taskStatus, setTaskStatus] = useState<string | undefined>();
+  const [taskPriority, setTaskPriority] = useState<string | undefined>();
   const [taskPageNo, setTaskPageNo] = useState(1);
   const [taskLoading, setTaskLoading] = useState(false);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
@@ -264,10 +286,10 @@ export function IngestionPage() {
     }
   };
 
-  const loadTasks = async (pageNo = taskPageNo, status = taskStatus) => {
+  const loadTasks = async (pageNo = taskPageNo, status = taskStatus, priority = taskPriority) => {
     setTaskLoading(true);
     try {
-      const data = await getIngestionTasks(pageNo, TASK_PAGE_SIZE, status);
+      const data = await getIngestionTasks(pageNo, TASK_PAGE_SIZE, status, priority);
       setTaskPage(data);
     } catch (error) {
       toast.error(getErrorMessage(error, "加载任务失败"));
@@ -283,7 +305,7 @@ export function IngestionPage() {
 
   useEffect(() => {
     loadTasks();
-  }, [taskPageNo, taskStatus]);
+  }, [taskPageNo, taskStatus, taskPriority]);
 
   useEffect(() => {
     loadPipelineOptions();
@@ -315,7 +337,7 @@ export function IngestionPage() {
 
   const handleTaskRefresh = () => {
     setTaskPageNo(1);
-    loadTasks(1, taskStatus);
+    loadTasks(1, taskStatus, taskPriority);
     loadPipelineOptions();
   };
 
@@ -501,6 +523,25 @@ export function IngestionPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Select
+                  value={taskPriority || "all"}
+                  onValueChange={(value) => {
+                    setTaskPageNo(1);
+                    setTaskPriority(value === "all" ? undefined : value);
+                  }}
+                >
+                  <SelectTrigger className="w-[150px]">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All priorities</SelectItem>
+                    {PRIORITY_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button variant="outline" onClick={handleTaskRefresh}>
                   <RefreshCw className="mr-2 h-4 w-4" />
                   刷新
@@ -522,7 +563,7 @@ export function IngestionPage() {
             ) : tasks.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground">暂无任务</div>
             ) : (
-              <Table className="min-w-[980px]">
+              <Table className="min-w-[1160px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-[220px]">任务ID</TableHead>
@@ -546,11 +587,18 @@ export function IngestionPage() {
                             {task.sourceFileName || task.sourceLocation || ""}
                           </span>
                         </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {formatSize(task.fileSize)}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={statusBadgeVariant(task.status)}>
                           {taskStatusLabel(task.status)}
                         </Badge>
+                        <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
+                          <Badge variant="outline">{task.priority || "-"}</Badge>
+                          <span>{formatQueueInfo(task)}</span>
+                        </div>
                       </TableCell>
                       <TableCell>{task.createdBy || "-"}</TableCell>
                       <TableCell>{task.chunkCount ?? "-"}</TableCell>
@@ -625,15 +673,15 @@ export function IngestionPage() {
         onOpenChange={setTaskDialogOpen}
         onSubmit={async (payload) => {
           const result = await createIngestionTask(payload);
-          toast.success(`任务已创建：${result.taskId}`);
+          toast.success(`任务已入队：${result.taskId}`);
           setTaskDialogOpen(false);
-          await loadTasks(1, taskStatus);
+          await loadTasks(1, taskStatus, taskPriority);
         }}
         onUpload={async (pipelineId, file) => {
           const result = await uploadIngestionTask(pipelineId, file);
-          toast.success(`上传成功：${result.taskId}`);
+          toast.success(`上传已入队：${result.taskId}`);
           setTaskDialogOpen(false);
-          await loadTasks(1, taskStatus);
+          await loadTasks(1, taskStatus, taskPriority);
         }}
       />
 
@@ -643,9 +691,9 @@ export function IngestionPage() {
         onOpenChange={setUploadDialogOpen}
         onSubmit={async (pipelineId, file) => {
           const result = await uploadIngestionTask(pipelineId, file);
-          toast.success(`上传成功：${result.taskId}`);
+          toast.success(`上传已入队：${result.taskId}`);
           setUploadDialogOpen(false);
-          await loadTasks(1, taskStatus);
+          await loadTasks(1, taskStatus, taskPriority);
         }}
       />
 
@@ -2280,10 +2328,18 @@ function TaskDetailDialog({ open, taskId, onOpenChange }: TaskDetailDialogProps)
                 <div className="text-sm text-muted-foreground">
                   Source: {task.sourceType || "-"} {task.sourceFileName || task.sourceLocation || ""}
                 </div>
+                <div className="text-sm text-muted-foreground">Priority: {task.priority || "-"}</div>
+                <div className="text-sm text-muted-foreground">
+                  Queue: {formatQueueInfo(task)}
+                  {task.estimatedWaitSeconds ? ` · ~${task.estimatedWaitSeconds}s` : ""}
+                </div>
+                <div className="text-sm text-muted-foreground">Size: {formatSize(task.fileSize)}</div>
                 <div className="text-sm text-muted-foreground">Chunks: {task.chunkCount ?? "-"}</div>
               </div>
               <div className="space-y-2 text-sm text-muted-foreground">
                 <div>Created: {formatDate(task.createTime)}</div>
+                <div>Queued: {formatDate(task.queuedAt)}</div>
+                <div>Queue started: {formatDate(task.queueStartedAt)}</div>
                 <div>Started: {formatDate(task.startedAt)}</div>
                 <div>Completed: {formatDate(task.completedAt)}</div>
               </div>

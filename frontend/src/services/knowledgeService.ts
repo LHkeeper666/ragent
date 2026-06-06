@@ -24,6 +24,12 @@ export interface KnowledgeDocument {
   fileUrl?: string | null;
   fileType?: string | null;
   fileSize?: number | null;
+  priority?: string | null;
+  queueStatus?: string | null;
+  queuePosition?: number | null;
+  estimatedWaitSeconds?: number | null;
+  queuedAt?: string | null;
+  queueStartedAt?: string | null;
   processMode?: string | null;
   chunkStrategy?: string | null;
   chunkConfig?: string | null;

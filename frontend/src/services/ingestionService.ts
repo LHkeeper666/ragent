@@ -45,7 +45,14 @@ export interface IngestionTask {
   sourceType?: string | null;
   sourceLocation?: string | null;
   sourceFileName?: string | null;
+  fileSize?: number | null;
   status?: string | null;
+  priority?: string | null;
+  queueStatus?: string | null;
+  queuePosition?: number | null;
+  estimatedWaitSeconds?: number | null;
+  queuedAt?: string | null;
+  queueStartedAt?: string | null;
   chunkCount?: number | null;
   errorMessage?: string | null;
   logs?: Array<{
@@ -125,9 +132,9 @@ export async function deleteIngestionPipeline(id: string) {
   await api.delete(`/ingestion/pipelines/${id}`);
 }
 
-export async function getIngestionTasks(pageNo = 1, pageSize = 10, status?: string) {
+export async function getIngestionTasks(pageNo = 1, pageSize = 10, status?: string, priority?: string) {
   return api.get<PageResult<IngestionTask>, PageResult<IngestionTask>>("/ingestion/tasks", {
-    params: { pageNo, pageSize, status: status || undefined }
+    params: { pageNo, pageSize, status: status || undefined, priority: priority || undefined }
   });
 }
 

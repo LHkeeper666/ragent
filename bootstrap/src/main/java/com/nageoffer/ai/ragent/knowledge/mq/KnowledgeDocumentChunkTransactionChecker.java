@@ -44,12 +44,20 @@ public class KnowledgeDocumentChunkTransactionChecker implements TransactionChec
     private final KnowledgeDocumentMapper documentMapper;
     private final DelegatingTransactionListener transactionListener;
 
-    @Value("knowledge-document-chunk_topic${unique-name:}")
-    private String chunkTopic;
+    @Value("knowledge-document-chunk-high_topic${unique-name:}")
+    private String chunkHighTopic;
+
+    @Value("knowledge-document-chunk-medium_topic${unique-name:}")
+    private String chunkMediumTopic;
+
+    @Value("knowledge-document-chunk-low_topic${unique-name:}")
+    private String chunkLowTopic;
 
     @PostConstruct
     public void init() {
-        transactionListener.registerChecker(chunkTopic, this);
+        transactionListener.registerChecker(chunkHighTopic, this);
+        transactionListener.registerChecker(chunkMediumTopic, this);
+        transactionListener.registerChecker(chunkLowTopic, this);
     }
 
     @Override
@@ -61,6 +69,6 @@ public class KnowledgeDocumentChunkTransactionChecker implements TransactionChec
         KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
 
         return documentDO != null
-                && DocumentStatus.RUNNING.getCode().equals(documentDO.getStatus());
+                && DocumentStatus.PENDING.getCode().equals(documentDO.getStatus());
     }
 }

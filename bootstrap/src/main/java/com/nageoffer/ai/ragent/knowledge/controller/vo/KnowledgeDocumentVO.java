@@ -20,6 +20,7 @@ package com.nageoffer.ai.ragent.knowledge.controller.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.Date;
 
 /**
  * 知识库文档视图对象
@@ -86,6 +87,18 @@ public class KnowledgeDocumentVO {
      * 文件大小（字节）
      */
     private Long fileSize;
+
+    private String priority;
+
+    private String queueStatus;
+
+    private Integer queuePosition;
+
+    private Long estimatedWaitSeconds;
+
+    private Date queuedAt;
+
+    private Date queueStartedAt;
 
     /**
      * 分块策略

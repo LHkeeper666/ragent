@@ -28,6 +28,9 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nageoffer.ai.ragent.common.queue.QueueStatus;
+import com.nageoffer.ai.ragent.common.queue.TaskPriority;
+import com.nageoffer.ai.ragent.common.queue.TaskQueueService;
 import com.nageoffer.ai.ragent.core.chunk.ChunkEmbeddingService;
 import com.nageoffer.ai.ragent.core.chunk.ChunkingMode;
 import com.nageoffer.ai.ragent.core.chunk.ChunkingOptions;
@@ -114,9 +117,16 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     private final MessageQueueProducer messageQueueProducer;
     private final KnowledgeScheduleProperties scheduleProperties;
     private final RemoteFileFetcher remoteFileFetcher;
+    private final TaskQueueService taskQueueService;
 
-    @Value("knowledge-document-chunk_topic${unique-name:}")
-    private String chunkTopic;
+    @Value("knowledge-document-chunk-high_topic${unique-name:}")
+    private String chunkHighTopic;
+
+    @Value("knowledge-document-chunk-medium_topic${unique-name:}")
+    private String chunkMediumTopic;
+
+    @Value("knowledge-document-chunk-low_topic${unique-name:}")
+    private String chunkLowTopic;
 
     @Override
     public KnowledgeDocumentVO upload(String kbId, KnowledgeDocumentUploadRequest requestParam, MultipartFile file) {
@@ -150,28 +160,44 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                 .build();
         documentMapper.insert(documentDO);
 
-        return BeanUtil.toBean(documentDO, KnowledgeDocumentVO.class);
+        return toDocumentVO(documentDO);
     }
 
     @Override
     public void startChunk(String docId) {
+        KnowledgeDocumentDO existing = documentMapper.selectById(docId);
+        Assert.notNull(existing, () -> new ClientException("Document not found"));
+        TaskPriority priority = taskQueueService.evaluatePriority(existing.getFileSize());
         KnowledgeDocumentChunkEvent event = KnowledgeDocumentChunkEvent.builder()
                 .docId(docId)
+                .kbId(existing.getKbId())
+                .priority(priority.getValue())
                 .operator(UserContext.getUsername())
                 .build();
 
         messageQueueProducer.sendInTransaction(
-                chunkTopic,
+                resolveChunkTopic(priority),
                 docId,
                 "文档分块",
                 event,
                 arg -> {
+                    Date queuedAt = new Date();
                     int updated = documentMapper.update(
                             new LambdaUpdateWrapper<KnowledgeDocumentDO>()
-                                    .set(KnowledgeDocumentDO::getStatus, DocumentStatus.RUNNING.getCode())
+                                    .set(KnowledgeDocumentDO::getStatus, DocumentStatus.PENDING.getCode())
+                                    .set(KnowledgeDocumentDO::getPriority, priority.getValue())
+                                    .set(KnowledgeDocumentDO::getQueueStatus, QueueStatus.QUEUED.getValue())
+                                    .set(KnowledgeDocumentDO::getQueuedAt, queuedAt)
+                                    .set(KnowledgeDocumentDO::getQueueStartedAt, null)
                                     .set(KnowledgeDocumentDO::getUpdatedBy, event.getOperator())
                                     .eq(KnowledgeDocumentDO::getId, docId)
                                     .ne(KnowledgeDocumentDO::getStatus, DocumentStatus.RUNNING.getCode())
+                                    .and(wrapper -> wrapper
+                                            .isNull(KnowledgeDocumentDO::getQueueStatus)
+                                            .or()
+                                            .notIn(KnowledgeDocumentDO::getQueueStatus,
+                                                    QueueStatus.QUEUED.getValue(),
+                                                    QueueStatus.RUNNING.getValue()))
                     );
                     if (updated == 0) {
                         KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
@@ -187,6 +213,27 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
 
     @Override
     public void executeChunk(String docId) {
+        int claimed = documentMapper.update(
+                new LambdaUpdateWrapper<KnowledgeDocumentDO>()
+                        .set(KnowledgeDocumentDO::getStatus, DocumentStatus.RUNNING.getCode())
+                        .set(KnowledgeDocumentDO::getQueueStatus, QueueStatus.RUNNING.getValue())
+                        .set(KnowledgeDocumentDO::getQueueStartedAt, new Date())
+                        .eq(KnowledgeDocumentDO::getId, docId)
+                        .eq(KnowledgeDocumentDO::getStatus, DocumentStatus.PENDING.getCode())
+                        .eq(KnowledgeDocumentDO::getQueueStatus, QueueStatus.QUEUED.getValue())
+        );
+        if (claimed == 0) {
+            KnowledgeDocumentDO current = documentMapper.selectById(docId);
+            if (current == null) {
+                log.warn("鏂囨。涓嶅瓨鍦紝璺宠繃鍒嗗潡浠诲姟, docId={}", docId);
+                return;
+            }
+            if (!DocumentStatus.RUNNING.getCode().equals(current.getStatus())) {
+                log.warn("Document chunk task is not claimable, docId={}, status={}, queueStatus={}",
+                        docId, current.getStatus(), current.getQueueStatus());
+                return;
+            }
+        }
         KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
         if (documentDO == null) {
             log.warn("文档不存在，跳过分块任务, docId={}", docId);
@@ -266,6 +313,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                     .id(docId)
                     .chunkCount(chunks.size())
                     .status(DocumentStatus.SUCCESS.getCode())
+                    .queueStatus(QueueStatus.COMPLETED.getValue())
                     .updatedBy(UserContext.getUsername())
                     .build();
             documentMapper.updateById(updateDocumentDO);
@@ -389,6 +437,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
             KnowledgeDocumentDO update = new KnowledgeDocumentDO();
             update.setId(docId);
             update.setStatus(DocumentStatus.FAILED.getCode());
+            update.setQueueStatus(QueueStatus.FAILED.getValue());
             update.setUpdatedBy(UserContext.getUsername());
             documentMapper.updateById(update);
         });
@@ -423,7 +472,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     public KnowledgeDocumentVO get(String docId) {
         KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
         Assert.notNull(documentDO, () -> new ClientException("文档不存在"));
-        return BeanUtil.toBean(documentDO, KnowledgeDocumentVO.class);
+        return toDocumentVO(documentDO);
     }
 
     @Override
@@ -539,7 +588,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                 .orderByDesc(KnowledgeDocumentDO::getCreateTime);
 
         return documentMapper.selectPage(pageParam, queryWrapper)
-                .convert(each -> BeanUtil.toBean(each, KnowledgeDocumentVO.class));
+                .convert(this::toDocumentVO);
     }
 
     @Override
@@ -694,6 +743,28 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         return pipelineMode
                 ? totalDuration - chunk - persist
                 : totalDuration - extract - chunk - embed - persist;
+    }
+
+    private KnowledgeDocumentVO toDocumentVO(KnowledgeDocumentDO documentDO) {
+        KnowledgeDocumentVO vo = BeanUtil.toBean(documentDO, KnowledgeDocumentVO.class);
+        if (DocumentStatus.PENDING.getCode().equals(documentDO.getStatus())
+                && QueueStatus.QUEUED.getValue().equals(documentDO.getQueueStatus())) {
+            Integer position = taskQueueService.knowledgeQueuePosition(
+                    documentDO.getPriority(),
+                    documentDO.getQueuedAt(),
+                    documentDO.getId());
+            vo.setQueuePosition(position);
+            vo.setEstimatedWaitSeconds(taskQueueService.estimateWaitSeconds(documentDO.getPriority(), position));
+        }
+        return vo;
+    }
+
+    private String resolveChunkTopic(TaskPriority priority) {
+        return switch (priority) {
+            case HIGH -> chunkHighTopic;
+            case MEDIUM -> chunkMediumTopic;
+            case LOW -> chunkLowTopic;
+        };
     }
 
     private String resolveCollectionName(String kbId) {
