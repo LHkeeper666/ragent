@@ -61,10 +61,24 @@ public class IngestionTaskVO {
      */
     private String sourceFileName;
 
+    private Long fileSize;
+
     /**
      * 任务状态
      */
     private String status;
+
+    private String priority;
+
+    private String queueStatus;
+
+    private Integer queuePosition;
+
+    private Long estimatedWaitSeconds;
+
+    private Date queuedAt;
+
+    private Date queueStartedAt;
 
     /**
      * 分片数量

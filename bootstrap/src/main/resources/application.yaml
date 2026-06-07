@@ -79,12 +79,27 @@ rag:
       max-wait-seconds: 5
       lease-seconds: 300
 
+  task-priority:
+    high:
+      max-file-count: 3
+      max-file-size: 1048576
+    low:
+      min-file-count: 20
+      min-file-size: 104857600
+    wait-estimate:
+      high-seconds-per-task: 5
+      medium-seconds-per-task: 30
+      low-seconds-per-task: 120
+
   knowledge:
     schedule:
       scan-delay-ms: 10000
       lock-seconds: 900
       batch-size: 20
       min-interval-seconds: 60
+
+  ingestion:
+    bucket-name: rag-ingestion
 
   mcp:
     servers:

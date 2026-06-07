@@ -102,6 +102,13 @@ const parseFrontMatter = (content: string): { head: string | null; body: string 
   return { head: null, body: content };
 };
 
+const formatQueueInfo = (doc: KnowledgeDocument) => {
+  if (doc.queueStatus === "queued") {
+    return doc.queuePosition ? `#${doc.queuePosition}` : "queued";
+  }
+  return doc.queueStatus || "-";
+};
+
 const formatSourceLabel = (sourceType?: string | null) => {
   const normalized = sourceType?.toLowerCase();
   if (normalized === "url") return "Remote URL";
@@ -397,7 +404,7 @@ export function KnowledgeDocumentsPage() {
     if (!chunkTarget) return;
     try {
       await startDocumentChunk(String(chunkTarget.id));
-      toast.success("已开始分块");
+      toast.success("分块任务已入队");
       setChunkTarget(null);
       await loadDocuments(current, statusFilter, keyword);
     } catch (error) {
@@ -696,6 +703,11 @@ export function KnowledgeDocumentsPage() {
                         <span className={cn("h-2 w-2 rounded-full", statusDotClass(doc.status))} />
                         <span>{doc.status || "-"}</span>
                       </div>
+                      <div className="mt-1 flex flex-wrap gap-1 text-xs text-muted-foreground">
+                        <span>{doc.priority || "-"}</span>
+                        <span>{formatQueueInfo(doc)}</span>
+                        {doc.estimatedWaitSeconds ? <span>~{doc.estimatedWaitSeconds}s</span> : null}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {(() => {
@@ -828,7 +840,7 @@ export function KnowledgeDocumentsPage() {
         onSubmit={async (payload) => {
           if (!kbId) return;
           await uploadDocument(kbId, payload);
-          toast.success("上传成功");
+          toast.success("上传成功，等待入队处理");
           setUploadOpen(false);
           setCurrent(1);
           await loadDocuments(1, statusFilter, keyword);
