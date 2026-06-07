@@ -19,6 +19,7 @@ import {
   KeyRound,
   Search,
   Settings,
+  Shield,
   Upload,
   Users,
   FolderKanban,
@@ -148,6 +149,11 @@ const menuGroups: MenuGroup[] = [
     title: "设置",
     items: [
       {
+        path: "/admin/eval",
+        label: "效果评测",
+        icon: Shield
+      },
+      {
         path: "/admin/users",
         label: "用户管理",
         icon: Users
@@ -177,7 +183,8 @@ const breadcrumbMap: Record<string, string> = {
   "sample-questions": "示例问题",
   mappings: "关键词映射",
   settings: "系统设置",
-  users: "用户管理"
+  users: "用户管理",
+  eval: "效果评测"
 };
 
 export function AdminLayout() {

@@ -119,6 +119,25 @@ rag:
     enabled: true
     max-error-length: 1000
 
+  eval:
+    enabled: false
+    sample-rate: 0.05
+    topic: rag-eval_topic${unique-name:}
+    default-model: qwen-plus
+    candidates:
+      - id: qwen-plus
+        provider: bailian
+        model: qwen-plus-latest
+        priority: 1
+      - id: qwen3-local
+        provider: ollama
+        model: qwen3:8b-fp16
+        priority: 2
+    metrics:
+      faithfulness: true
+      answer-relevancy: true
+      correctness: true
+
 ai:
   providers:
     ollama:

@@ -17,8 +17,11 @@
 
 package com.nageoffer.ai.ragent.rag.service.handler;
 
+import com.nageoffer.ai.ragent.framework.mq.producer.MessageQueueProducer;
 import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
+import com.nageoffer.ai.ragent.rag.eval.EvalPendingStore;
+import com.nageoffer.ai.ragent.rag.eval.config.RagEvalProperties;
 import com.nageoffer.ai.ragent.rag.service.ConversationGroupService;
 import lombok.Builder;
 import lombok.Getter;
@@ -66,4 +69,10 @@ public class StreamChatHandlerParams {
      * 任务管理器
      */
     private final StreamTaskManager taskManager;
+
+    private final EvalPendingStore evalPendingStore;
+
+    private final MessageQueueProducer mqProducer;
+
+    private final RagEvalProperties evalProperties;
 }

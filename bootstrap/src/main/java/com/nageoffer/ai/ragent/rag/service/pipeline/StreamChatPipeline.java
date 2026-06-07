@@ -42,6 +42,7 @@ import com.nageoffer.ai.ragent.rag.config.WebSearchProperties;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
 import com.nageoffer.ai.ragent.rag.core.search.WebSearchResult;
 import com.nageoffer.ai.ragent.rag.core.search.WebSearchService;
+import com.nageoffer.ai.ragent.rag.eval.EvalPendingStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -81,6 +82,7 @@ public class StreamChatPipeline {
     private final RAGPromptService promptBuilder;
     private final PromptTemplateLoader promptTemplateLoader;
     private final StreamTaskManager taskManager;
+    private final EvalPendingStore evalPendingStore;
 
     /**
      * 执行流式对话管道
@@ -268,6 +270,15 @@ public class StreamChatPipeline {
         // 聚合所有意图用于 prompt 规划
         IntentGroup mergedGroup = intentResolver.mergeIntentGroup(ctx.getSubIntents());
 
+        // 保存检索上下文到 ctx 和 EvalPendingStore，供评测使用
+        String kbCtx = truncateForEval(retrievalCtx.getKbContext());
+        String mcpCtx = truncateForEval(retrievalCtx.getMcpContext());
+        ctx.setRetrievalKbContext(kbCtx);
+        ctx.setRetrievalMcpContext(mcpCtx);
+        evalPendingStore.put(ctx.getTaskId(), new EvalPendingStore.PendingData(
+                com.nageoffer.ai.ragent.framework.trace.RagTraceContext.getTraceId(),
+                ctx.getQuestion(), kbCtx, mcpCtx));
+
         StreamCancellationHandle handle = streamLLMResponse(
                 ctx.getRewriteResult(),
                 retrievalCtx,
@@ -277,6 +288,11 @@ public class StreamChatPipeline {
                 ctx.getCallback()
         );
         taskManager.bindHandle(ctx.getTaskId(), handle);
+    }
+
+    private String truncateForEval(String s) {
+        if (s == null) return null;
+        return s.length() <= 8192 ? s : s.substring(0, 8192);
     }
 
     // ==================== LLM 响应 ====================

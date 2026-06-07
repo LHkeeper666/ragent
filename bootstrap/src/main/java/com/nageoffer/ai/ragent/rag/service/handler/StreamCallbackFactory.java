@@ -17,9 +17,12 @@
 
 package com.nageoffer.ai.ragent.rag.service.handler;
 
+import com.nageoffer.ai.ragent.framework.mq.producer.MessageQueueProducer;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
 import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
+import com.nageoffer.ai.ragent.rag.eval.EvalPendingStore;
+import com.nageoffer.ai.ragent.rag.eval.config.RagEvalProperties;
 import com.nageoffer.ai.ragent.rag.service.ConversationGroupService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -37,6 +40,9 @@ public class StreamCallbackFactory {
     private final ConversationMemoryService memoryService;
     private final ConversationGroupService conversationGroupService;
     private final StreamTaskManager taskManager;
+    private final EvalPendingStore evalPendingStore;
+    private final MessageQueueProducer mqProducer;
+    private final RagEvalProperties evalProperties;
 
     /**
      * 创建聊天事件处理器
@@ -57,6 +63,9 @@ public class StreamCallbackFactory {
                 .memoryService(memoryService)
                 .conversationGroupService(conversationGroupService)
                 .taskManager(taskManager)
+                .evalPendingStore(evalPendingStore)
+                .mqProducer(mqProducer)
+                .evalProperties(evalProperties)
                 .build();
 
         return new StreamChatEventHandler(params);

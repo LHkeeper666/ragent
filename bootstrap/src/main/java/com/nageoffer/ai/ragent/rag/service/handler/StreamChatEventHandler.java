@@ -25,14 +25,19 @@ import com.nageoffer.ai.ragent.rag.dto.MetaPayload;
 import com.nageoffer.ai.ragent.rag.enums.SSEEventType;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
 import com.nageoffer.ai.ragent.framework.convention.ChatMessage;
+import com.nageoffer.ai.ragent.framework.mq.producer.MessageQueueProducer;
 import com.nageoffer.ai.ragent.framework.web.SseEmitterSender;
 import com.nageoffer.ai.ragent.infra.chat.StreamCallback;
 import com.nageoffer.ai.ragent.infra.config.AIModelProperties;
 import com.nageoffer.ai.ragent.rag.core.memory.ConversationMemoryService;
+import com.nageoffer.ai.ragent.rag.eval.EvalPendingStore;
+import com.nageoffer.ai.ragent.rag.eval.config.RagEvalProperties;
+import com.nageoffer.ai.ragent.rag.eval.mq.event.RagEvalEvent;
 import lombok.extern.slf4j.Slf4j;
 import com.nageoffer.ai.ragent.rag.service.ConversationGroupService;
 
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 public class StreamChatEventHandler implements StreamCallback {
@@ -48,6 +53,9 @@ public class StreamChatEventHandler implements StreamCallback {
     private final String taskId;
     private final String userId;
     private final StreamTaskManager taskManager;
+    private final EvalPendingStore evalPendingStore;
+    private final MessageQueueProducer mqProducer;
+    private final RagEvalProperties evalProperties;
     private final boolean sendTitleOnComplete;
     private final StringBuilder answer = new StringBuilder();
     private final StringBuilder thinking = new StringBuilder();
@@ -66,6 +74,9 @@ public class StreamChatEventHandler implements StreamCallback {
         this.memoryService = params.getMemoryService();
         this.conversationGroupService = params.getConversationGroupService();
         this.taskManager = params.getTaskManager();
+        this.evalPendingStore = params.getEvalPendingStore();
+        this.mqProducer = params.getMqProducer();
+        this.evalProperties = params.getEvalProperties();
         this.userId = UserContext.getUserId();
 
         // 计算配置
@@ -172,6 +183,8 @@ public class StreamChatEventHandler implements StreamCallback {
         sender.sendEvent(SSEEventType.DONE.value(), "[DONE]");
         taskManager.unregister(taskId);
         sender.complete();
+
+        tryEvalDispatch(messageId);
     }
 
     @Override
@@ -181,6 +194,35 @@ public class StreamChatEventHandler implements StreamCallback {
         }
         taskManager.unregister(taskId);
         sender.fail(t);
+    }
+
+    private void tryEvalDispatch(String messageId) {
+        if (!evalProperties.isEnabled()) {
+            return;
+        }
+        try {
+            double sampleRate = evalProperties.getSampleRate();
+            if (sampleRate < 1.0 && ThreadLocalRandom.current().nextDouble() >= sampleRate) {
+                return;
+            }
+            EvalPendingStore.PendingData pending = evalPendingStore.remove(taskId);
+            if (pending == null) {
+                return;
+            }
+            RagEvalEvent event = RagEvalEvent.builder()
+                    .traceId(pending.getTraceId())
+                    .conversationId(conversationId)
+                    .messageId(messageId)
+                    .question(pending.getQuestion())
+                    .answer(answer.toString())
+                    .kbContext(pending.getKbContext())
+                    .mcpContext(pending.getMcpContext())
+                    .build();
+            String topic = evalProperties.getTopic();
+            mqProducer.send(topic, messageId, "RAG在线评测", event);
+        } catch (Exception e) {
+            log.warn("评测事件派发失败, taskId={}, messageId={}", taskId, messageId, e);
+        }
     }
 
     private void sendChunked(String type, String content) {

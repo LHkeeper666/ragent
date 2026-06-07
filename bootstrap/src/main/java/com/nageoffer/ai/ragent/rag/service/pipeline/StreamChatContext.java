@@ -53,4 +53,10 @@ public class StreamChatContext {
 
     @Setter
     private List<SubQuestionIntent> subIntents;
+
+    @Setter
+    private String retrievalKbContext;
+
+    @Setter
+    private String retrievalMcpContext;
 }
