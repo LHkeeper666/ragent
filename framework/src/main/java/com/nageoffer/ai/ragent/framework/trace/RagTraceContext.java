@@ -30,7 +30,15 @@ public final class RagTraceContext {
 
     private static final TransmittableThreadLocal<String> TRACE_ID = new TransmittableThreadLocal<>();
     private static final TransmittableThreadLocal<String> TASK_ID = new TransmittableThreadLocal<>();
-    private static final TransmittableThreadLocal<Deque<String>> NODE_STACK = new TransmittableThreadLocal<>();
+    // 父线程 -> 子线程的 NODE_STACK 必须深拷贝
+    // 默认 copy() 返回父值引用，并发子任务会共用同一个 Deque，
+    // 互相 push/pop 时父子节点 ID 串挂，trace 层级紊乱
+    private static final TransmittableThreadLocal<Deque<String>> NODE_STACK = new TransmittableThreadLocal<>() {
+        @Override
+        public Deque<String> copy(Deque<String> parentValue) {
+            return parentValue == null ? null : new ArrayDeque<>(parentValue);
+        }
+    };
 
     private RagTraceContext() {
     }

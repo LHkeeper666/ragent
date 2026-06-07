@@ -19,6 +19,7 @@ package com.nageoffer.ai.ragent.rag.core.guidance;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.nageoffer.ai.ragent.framework.trace.RagTraceNode;
 import com.nageoffer.ai.ragent.rag.config.GuidanceProperties;
 import com.nageoffer.ai.ragent.rag.constant.RAGConstant;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
@@ -50,6 +51,7 @@ public class IntentGuidanceService {
     private final PromptTemplateLoader promptTemplateLoader;
     private final AmbiguityLLMChecker ambiguityLLMChecker;
 
+    @RagTraceNode(name = "guidance-detect", type = "GUIDANCE")
     public GuidanceDecision detectAmbiguity(String question, List<SubQuestionIntent> subIntents) {
         if (!Boolean.TRUE.equals(guidanceProperties.getEnabled())) {
             return GuidanceDecision.none();

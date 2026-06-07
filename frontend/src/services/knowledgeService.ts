@@ -33,6 +33,7 @@ export interface KnowledgeDocument {
   updatedBy?: string | null;
   createTime?: string | null;
   updateTime?: string | null;
+  chunksEdited?: boolean | null;
 }
 
 export interface KnowledgeChunk {
@@ -326,6 +327,10 @@ export const batchToggleChunks = async (
     { chunkIds },
     { params: { value: enabled } }
   );
+};
+
+export const previewDocument = async (docId: string): Promise<string> => {
+  return api.get<unknown, string>(`/knowledge-base/docs/${docId}/preview`);
 };
 
 // 文档分块日志管理

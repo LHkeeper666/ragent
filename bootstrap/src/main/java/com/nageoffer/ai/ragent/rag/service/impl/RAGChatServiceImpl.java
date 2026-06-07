@@ -53,18 +53,18 @@ public class RAGChatServiceImpl implements RAGChatService {
         String taskId = IdUtil.getSnowflakeNextIdStr();
         StreamCallback callback = callbackFactory.createChatEventHandler(emitter, actualConversationId, taskId);
 
-        StreamChatContext ctx = StreamChatContext.builder()
-                .question(question)
-                .conversationId(actualConversationId)
-                .taskId(taskId)
-                .deepThinking(Boolean.TRUE.equals(deepThinking))
-                .userId(UserContext.getUserId())
-                .callback(callback)
-                .build();
-
         chatQueueLimiter.enqueue(question, actualConversationId, emitter,
-                () -> traceRunner.run(question, actualConversationId, taskId, callback,
-                        () -> chatPipeline.execute(ctx)));
+                () -> traceRunner.run(question, actualConversationId, taskId, callback, traceAware -> {
+                    StreamChatContext ctx = StreamChatContext.builder()
+                            .question(question)
+                            .conversationId(actualConversationId)
+                            .taskId(taskId)
+                            .deepThinking(Boolean.TRUE.equals(deepThinking))
+                            .userId(UserContext.getUserId())
+                            .callback(traceAware)
+                            .build();
+                    chatPipeline.execute(ctx);
+                }));
     }
 
     @Override

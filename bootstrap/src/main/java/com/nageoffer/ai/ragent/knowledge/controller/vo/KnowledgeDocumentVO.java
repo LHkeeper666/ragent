@@ -134,4 +134,10 @@ public class KnowledgeDocumentVO {
      * 更新时间
      */
     private LocalDateTime updateTime;
+
+    /**
+     * 是否存在被手工编辑过的分块（基于 chunk.updateTime > chunk.createTime 推断）
+     * 仅查询时填充，不持久化。重新分块会将该状态清零
+     */
+    private Boolean chunksEdited;
 }

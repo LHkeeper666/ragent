@@ -318,7 +318,7 @@ export function AdminLayout() {
     }
 
     if (section === "knowledge" && segments.includes("docs")) {
-      items.push({ label: "切片管理" });
+      items.push({ label: "分块管理" });
     }
 
     if (section === "traces" && segments.length > 2) {

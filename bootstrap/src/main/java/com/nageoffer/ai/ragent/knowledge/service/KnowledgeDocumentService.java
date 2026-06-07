@@ -116,4 +116,12 @@ public interface KnowledgeDocumentService {
      * @return 分块日志分页结果
      */
     IPage<KnowledgeDocumentChunkLogVO> getChunkLogs(String docId, Page<KnowledgeDocumentChunkLogVO> page);
+
+    /**
+     * 预览 markdown 文档内容
+     *
+     * @param docId 文档 ID
+     * @return markdown 原始文本内容
+     */
+    String preview(String docId);
 }

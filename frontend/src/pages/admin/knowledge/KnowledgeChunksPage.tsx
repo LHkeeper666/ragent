@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { RelativeTime } from "@/components/RelativeTime";
 
 import type { KnowledgeChunk, KnowledgeDocument, PageResult } from "@/services/knowledgeService";
 import {
@@ -22,6 +23,7 @@ import {
   toggleChunk,
   getChunksPage,
   getDocument,
+  getKnowledgeBase,
   updateChunk
 } from "@/services/knowledgeService";
 import { getErrorMessage } from "@/utils/error";
@@ -34,19 +36,13 @@ const truncateText = (value?: string | null, max = 120) => {
   return `${value.slice(0, max)}...`;
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("zh-CN");
-};
-
 const enabledLabel = (enabled?: number | null) => (enabled === 1 ? "启用" : "禁用");
 
 export function KnowledgeChunksPage() {
   const { kbId, docId } = useParams();
   const navigate = useNavigate();
   const [doc, setDoc] = useState<KnowledgeDocument | null>(null);
+  const [kbName, setKbName] = useState("");
   const [pageData, setPageData] = useState<PageResult<KnowledgeChunk> | null>(null);
   const [pageNo, setPageNo] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -94,6 +90,12 @@ export function KnowledgeChunksPage() {
   useEffect(() => {
     loadDocument();
   }, [docId]);
+
+  useEffect(() => {
+    if (kbId) {
+      getKnowledgeBase(kbId).then(kb => setKbName(kb.name)).catch(() => {});
+    }
+  }, [kbId]);
 
   useEffect(() => {
     loadChunks();
@@ -183,7 +185,7 @@ export function KnowledgeChunksPage() {
         <div>
           <h1 className="admin-page-title">分块管理</h1>
           <p className="admin-page-subtitle">
-            {doc?.docName || docId} {kbId ? `（知识库: ${kbId}）` : ""}
+            {doc?.docName || docId} {kbName ? `（知识库: ${kbName}）` : ""}
           </p>
         </div>
         <div className="admin-page-actions">
@@ -298,7 +300,7 @@ export function KnowledgeChunksPage() {
                     </TableCell>
                     <TableCell>{chunk.charCount ?? "-"}</TableCell>
                     <TableCell>{chunk.tokenCount ?? "-"}</TableCell>
-                    <TableCell>{formatDate(chunk.updateTime)}</TableCell>
+                    <TableCell><RelativeTime value={chunk.updateTime} /></TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button size="sm" variant="outline" onClick={() => setEditDialog({ open: true, chunk })}>

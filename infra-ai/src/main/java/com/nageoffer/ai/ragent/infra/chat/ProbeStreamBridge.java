@@ -29,7 +29,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * 流式首包探测桥接器
  */
-final class ProbeStreamBridge implements StreamCallback {
+public final class ProbeStreamBridge implements StreamCallback {
 
     private final StreamCallback downstream;
     private final CompletableFuture<ProbeResult> probe = new CompletableFuture<>();
@@ -111,7 +111,7 @@ final class ProbeStreamBridge implements StreamCallback {
      * 探测结果
      */
     @Getter
-    static class ProbeResult {
+    public static class ProbeResult {
 
         enum Type {SUCCESS, ERROR, TIMEOUT, NO_CONTENT}
 

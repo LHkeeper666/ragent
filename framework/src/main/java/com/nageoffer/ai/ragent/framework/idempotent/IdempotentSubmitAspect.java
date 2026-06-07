@@ -29,6 +29,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -48,11 +49,17 @@ public final class IdempotentSubmitAspect {
     private final RedissonClient redissonClient;
     private final Gson gson = new Gson();
 
+    @Value("${app.eval.enabled:false}")
+    private boolean evalEnabled;
+
     /**
      * 增强方法标记 {@link IdempotentSubmit} 注解逻辑
      */
     @Around("@annotation(com.nageoffer.ai.ragent.framework.idempotent.IdempotentSubmit)")
     public Object idempotentSubmit(ProceedingJoinPoint joinPoint) throws Throwable {
+        if (evalEnabled) {
+            return joinPoint.proceed();
+        }
         IdempotentSubmit idempotentSubmit = getIdempotentSubmitAnnotation(joinPoint);
         // 获取分布式锁标识
         String lockKey = buildLockKey(joinPoint, idempotentSubmit);

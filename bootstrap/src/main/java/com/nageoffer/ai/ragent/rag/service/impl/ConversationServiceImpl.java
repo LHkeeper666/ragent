@@ -29,11 +29,7 @@ import com.nageoffer.ai.ragent.rag.dao.mapper.ConversationMapper;
 import com.nageoffer.ai.ragent.rag.dao.mapper.ConversationMessageMapper;
 import com.nageoffer.ai.ragent.rag.dao.mapper.ConversationSummaryMapper;
 import com.nageoffer.ai.ragent.framework.context.UserContext;
-import com.nageoffer.ai.ragent.framework.convention.ChatMessage;
-import com.nageoffer.ai.ragent.framework.convention.ChatRequest;
 import com.nageoffer.ai.ragent.framework.exception.ClientException;
-import com.nageoffer.ai.ragent.infra.chat.LLMService;
-import com.nageoffer.ai.ragent.rag.core.prompt.PromptTemplateLoader;
 import com.nageoffer.ai.ragent.rag.service.ConversationService;
 import com.nageoffer.ai.ragent.rag.service.bo.ConversationCreateBO;
 import lombok.RequiredArgsConstructor;
@@ -42,10 +38,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
-
-import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.CONVERSATION_TITLE_PROMPT_PATH;
 
 /**
  * 会话服务实现类
@@ -60,8 +53,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final ConversationMessageMapper messageMapper;
     private final ConversationSummaryMapper summaryMapper;
     private final MemoryProperties memoryProperties;
-    private final PromptTemplateLoader promptTemplateLoader;
-    private final LLMService llmService;
+    private final ConversationTitleGenerator titleGenerator;
 
     @Override
     public List<ConversationVO> listByUserId(String userId) {
@@ -105,7 +97,7 @@ public class ConversationServiceImpl implements ConversationService {
         );
 
         if (existing == null) {
-            String title = generateTitleFromQuestion(question);
+            String title = titleGenerator.generate(question);
             ConversationDO record = ConversationDO.builder()
                     .conversationId(conversationId)
                     .userId(userId)
@@ -183,31 +175,4 @@ public class ConversationServiceImpl implements ConversationService {
         );
     }
 
-    private String generateTitleFromQuestion(String question) {
-        int maxLen = memoryProperties.getTitleMaxLength();
-        if (maxLen <= 0) {
-            maxLen = 30;
-        }
-        String prompt = promptTemplateLoader.render(
-                CONVERSATION_TITLE_PROMPT_PATH,
-                Map.of(
-                        "title_max_chars", String.valueOf(maxLen),
-                        "question", question
-                )
-        );
-
-        try {
-            ChatRequest request = ChatRequest.builder()
-                    .messages(List.of(ChatMessage.user(prompt)))
-                    .temperature(0.7D)
-                    .topP(0.3D)
-                    .thinking(false)
-                    .build();
-
-            return llmService.chat(request);
-        } catch (Exception ex) {
-            log.warn("生成会话标题失败", ex);
-            return "新对话";
-        }
-    }
 }
