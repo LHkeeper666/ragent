@@ -13,6 +13,15 @@ BEGIN
   END IF;
 END $$;
 
+-- zhparser token 类型映射（n/v/a/i/e/l → simple），否则 token 被丢弃
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR n;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR v;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR a;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR i;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR e;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR l;
+ALTER TEXT SEARCH CONFIGURATION zhparser ADD MAPPING FOR n,v,a,i,e,l WITH simple;
+
 -- ============================================
 -- User & Conversation Tables
 -- ============================================
@@ -146,6 +155,10 @@ CREATE TABLE t_knowledge_document (
     file_url         VARCHAR(1024) NOT NULL,
     file_type        VARCHAR(16)   NOT NULL,
     file_size        BIGINT,
+    priority         VARCHAR(16),
+    queue_status     VARCHAR(16),
+    queued_at        TIMESTAMP,
+    queue_started_at TIMESTAMP,
     process_mode     VARCHAR(16)   DEFAULT 'chunk',
     status           VARCHAR(16)   NOT NULL DEFAULT 'pending',
     source_type      VARCHAR(16),
@@ -162,6 +175,7 @@ CREATE TABLE t_knowledge_document (
     deleted          SMALLINT      NOT NULL DEFAULT 0
 );
 CREATE INDEX idx_kb_id ON t_knowledge_document (kb_id);
+CREATE INDEX idx_knowledge_document_queue ON t_knowledge_document (status, priority, queued_at);
 COMMENT ON TABLE t_knowledge_document IS '知识库文档表';
 
 CREATE TABLE t_knowledge_chunk (
@@ -386,7 +400,14 @@ CREATE TABLE t_ingestion_task (
     source_type      VARCHAR(20) NOT NULL,
     source_location  TEXT,
     source_file_name VARCHAR(255),
+    file_url         VARCHAR(1024),
+    file_size        BIGINT,
+    mime_type        VARCHAR(128),
     status           VARCHAR(16) NOT NULL,
+    priority         VARCHAR(16),
+    queue_status     VARCHAR(16),
+    queued_at        TIMESTAMP,
+    queue_started_at TIMESTAMP,
     chunk_count      INTEGER     DEFAULT 0,
     error_message    TEXT,
     logs_json        JSONB,
@@ -401,6 +422,7 @@ CREATE TABLE t_ingestion_task (
 );
 CREATE INDEX idx_ingestion_task_pipeline ON t_ingestion_task (pipeline_id);
 CREATE INDEX idx_ingestion_task_status ON t_ingestion_task (status);
+CREATE INDEX idx_ingestion_task_queue ON t_ingestion_task (status, priority, queued_at);
 COMMENT ON TABLE t_ingestion_task IS '摄取任务表';
 
 CREATE TABLE t_ingestion_task_node (

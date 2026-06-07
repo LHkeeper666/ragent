@@ -68,9 +68,44 @@ public class IngestionTaskDO {
     private String sourceFileName;
 
     /**
+     * stored file url for asynchronous file ingestion
+     */
+    private String fileUrl;
+
+    /**
+     * file size in bytes
+     */
+    private Long fileSize;
+
+    /**
+     * mime type for uploaded file
+     */
+    private String mimeType;
+
+    /**
      * 任务状态 (如: pending, running, completed, failed)
      */
     private String status;
+
+    /**
+     * priority: high / medium / low
+     */
+    private String priority;
+
+    /**
+     * queue status: queued / running / completed / failed
+     */
+    private String queueStatus;
+
+    /**
+     * enqueue time
+     */
+    private Date queuedAt;
+
+    /**
+     * actual queue execution start time
+     */
+    private Date queueStartedAt;
 
     /**
      * 切片数量

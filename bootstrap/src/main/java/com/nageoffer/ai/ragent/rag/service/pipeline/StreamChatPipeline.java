@@ -38,15 +38,23 @@ import com.nageoffer.ai.ragent.rag.dto.IntentGroup;
 import com.nageoffer.ai.ragent.rag.dto.RetrievalContext;
 import com.nageoffer.ai.ragent.rag.dto.SubQuestionIntent;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
+import com.nageoffer.ai.ragent.rag.config.WebSearchProperties;
 import com.nageoffer.ai.ragent.rag.service.handler.StreamTaskManager;
+import com.nageoffer.ai.ragent.rag.core.search.WebSearchResult;
+import com.nageoffer.ai.ragent.rag.core.search.WebSearchService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.CHAT_SYSTEM_PROMPT_PATH;
+import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.INTENT_MIN_SCORE;
+import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.RAG_AUGMENTED_PROMPT_PATH;
 
 /**
  * 流式对话流水线
@@ -62,6 +70,8 @@ import static com.nageoffer.ai.ragent.rag.constant.RAGConstant.CHAT_SYSTEM_PROMP
 public class StreamChatPipeline {
 
     private final SearchChannelProperties searchProperties;
+    private final WebSearchProperties webSearchProperties;
+    private final WebSearchService webSearchService;
     private final ConversationMemoryService memoryService;
     private final QueryRewriteService queryRewriteService;
     private final IntentResolver intentResolver;
@@ -89,6 +99,10 @@ public class StreamChatPipeline {
 
         RetrievalContext retrievalCtx = retrieve(ctx);
         if (handleEmptyRetrieval(ctx, retrievalCtx)) {
+            return;
+        }
+
+        if (shouldAugmentWithWebSearch(ctx, retrievalCtx)) {
             return;
         }
 
@@ -161,10 +175,93 @@ public class StreamChatPipeline {
         if (!retrievalCtx.isEmpty()) {
             return false;
         }
+        if (webSearchProperties.isEnabled()) {
+            return handleAugmentedSearch(ctx);
+        }
         StreamCallback callback = ctx.getCallback();
         callback.onContent("未检索到与问题相关的文档内容。");
         callback.onComplete();
         return true;
+    }
+
+    private boolean shouldAugmentWithWebSearch(StreamChatContext ctx, RetrievalContext retrievalCtx) {
+        if (!webSearchProperties.isEnabled()) {
+            return false;
+        }
+        if (!hasLowConfidenceIntents(ctx)) {
+            return false;
+        }
+        log.info("意图置信度不足，启用联网搜索增强");
+        return handleAugmentedSearch(ctx, retrievalCtx);
+    }
+
+    /**
+     * 所有 KB 意图分数均低于 INTENT_MIN_SCORE，说明检索结果不可靠
+     */
+    private boolean hasLowConfidenceIntents(StreamChatContext ctx) {
+        List<SubQuestionIntent> subIntents = ctx.getSubIntents();
+        if (CollUtil.isEmpty(subIntents)) {
+            return true;
+        }
+        return subIntents.stream()
+                .flatMap(si -> si.nodeScores().stream())
+                .noneMatch(ns -> ns.getScore() >= INTENT_MIN_SCORE);
+    }
+
+    private boolean handleAugmentedSearch(StreamChatContext ctx) {
+        return handleAugmentedSearch(ctx, null);
+    }
+
+    private boolean handleAugmentedSearch(StreamChatContext ctx, RetrievalContext retrievalCtx) {
+        StreamCallback callback = ctx.getCallback();
+        try {
+            String question = ctx.getRewriteResult().rewrittenQuestion();
+            int maxResults = webSearchProperties.getMaxResults();
+            List<WebSearchResult> results = webSearchService.search(question, maxResults);
+            if (CollUtil.isEmpty(results)) {
+                // 有 KB 上下文但没有联网结果，走正常 RAG
+                if (retrievalCtx != null && !retrievalCtx.isEmpty()) {
+                    log.info("联网搜索无结果，回退到正常 RAG");
+                    return false;
+                }
+                callback.onContent("未检索到相关内容，联网搜索也未找到相关信息。");
+                callback.onComplete();
+                return true;
+            }
+            String searchContext = results.stream()
+                    .map(r -> "标题: " + r.title() + "\n链接: " + r.url() + "\n摘要: " + r.snippet())
+                    .collect(Collectors.joining("\n\n"));
+            Map<String, String> slots = new HashMap<>();
+            slots.put("search_results", searchContext);
+            slots.put("question", question);
+            if (retrievalCtx != null && retrievalCtx.hasKb()) {
+                slots.put("kb_context", retrievalCtx.getKbContext());
+            }
+            String systemPrompt = promptTemplateLoader.render(RAG_AUGMENTED_PROMPT_PATH, slots);
+            List<ChatMessage> messages = new ArrayList<>();
+            messages.add(ChatMessage.system(systemPrompt));
+            List<ChatMessage> history = ctx.getHistory();
+            if (CollUtil.isNotEmpty(history)) {
+                messages.addAll(history);
+            }
+            messages.add(ChatMessage.user(question));
+            ChatRequest req = ChatRequest.builder()
+                    .messages(messages)
+                    .temperature(0.3D)
+                    .thinking(false)
+                    .build();
+            StreamCancellationHandle handle = llmService.streamChat(req, callback);
+            taskManager.bindHandle(ctx.getTaskId(), handle);
+            return true;
+        } catch (Exception e) {
+            log.warn("联网搜索增强回答失败，降级", e);
+            if (retrievalCtx != null && !retrievalCtx.isEmpty()) {
+                return false; // 回退到正常 RAG
+            }
+            callback.onContent("未检索到与问题相关的文档内容。");
+            callback.onComplete();
+            return true;
+        }
     }
 
     private void streamRagResponse(StreamChatContext ctx, RetrievalContext retrievalCtx) {

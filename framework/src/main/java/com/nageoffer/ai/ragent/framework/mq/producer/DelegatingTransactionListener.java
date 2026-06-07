@@ -27,6 +27,8 @@ import org.springframework.messaging.Message;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.io.ByteArrayInputStream;
+import java.io.ObjectInputStream;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Consumer;
@@ -88,7 +90,7 @@ public class DelegatingTransactionListener implements RocketMQLocalTransactionLi
             return RocketMQLocalTransactionState.ROLLBACK;
         }
         try {
-            MessageWrapper<?> wrapper = (MessageWrapper<?>) message.getPayload();
+            MessageWrapper<?> wrapper = deserializePayload(message.getPayload());
             boolean committed = checker.check(wrapper);
             RocketMQLocalTransactionState state = committed
                     ? RocketMQLocalTransactionState.COMMIT
@@ -99,5 +101,23 @@ public class DelegatingTransactionListener implements RocketMQLocalTransactionLi
             log.error("[事务消息] 回查异常, topic={}", topic, e);
             return RocketMQLocalTransactionState.UNKNOWN;
         }
+    }
+
+    /**
+     * 反序列化消息体。Broker 回查时 payload 以 byte[] 形式返回，
+     * 需要 Java 反序列化还原为 MessageWrapper；正常执行时已是 MessageWrapper 实例。
+     */
+    private MessageWrapper<?> deserializePayload(Object payload) {
+        if (payload instanceof MessageWrapper<?> mw) {
+            return mw;
+        }
+        if (payload instanceof byte[] bytes) {
+            try (ObjectInputStream ois = new ObjectInputStream(new ByteArrayInputStream(bytes))) {
+                return (MessageWrapper<?>) ois.readObject();
+            } catch (Exception e) {
+                throw new IllegalStateException("Failed to deserialize MessageWrapper from byte[]", e);
+            }
+        }
+        throw new IllegalStateException("Unexpected payload type: " + payload.getClass().getName());
     }
 }

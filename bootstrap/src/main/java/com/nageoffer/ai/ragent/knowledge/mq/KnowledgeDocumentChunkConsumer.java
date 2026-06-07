@@ -36,8 +36,9 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @RocketMQMessageListener(
-        topic = "knowledge-document-chunk_topic${unique-name:}",
-        consumerGroup = "knowledge-document-chunk_cg${unique-name:}"
+        topic = "knowledge-document-chunk-medium_topic${unique-name:}",
+        consumerGroup = "knowledge-document-chunk-medium_cg${unique-name:}",
+        consumeThreadNumber = 4
 )
 public class KnowledgeDocumentChunkConsumer implements RocketMQListener<MessageWrapper<KnowledgeDocumentChunkEvent>> {
 

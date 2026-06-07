@@ -16,6 +16,15 @@ BEGIN
   END IF;
 END $$;
 
+-- 3a. token 类型映射：zhparser 产出的 n/v/a/i/e/l 必须映射到 simple 词典，否则 PG 丢弃这些 token
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR n;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR v;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR a;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR i;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR e;
+ALTER TEXT SEARCH CONFIGURATION zhparser DROP MAPPING IF EXISTS FOR l;
+ALTER TEXT SEARCH CONFIGURATION zhparser ADD MAPPING FOR n,v,a,i,e,l WITH simple;
+
 -- 4. 触发器：自动维护 tsv 列（zhparser 分词）
 CREATE OR REPLACE FUNCTION kv_tsv_trigger() RETURNS trigger AS $$
 BEGIN
@@ -30,3 +39,24 @@ CREATE TRIGGER trg_kv_tsv BEFORE INSERT OR UPDATE OF content ON t_knowledge_vect
 
 -- 5. 回填已有数据（zhparser 分词）
 UPDATE t_knowledge_vector SET tsv = to_tsvector('zhparser', COALESCE(content, ''));
+
+ALTER TABLE t_knowledge_document
+    ADD COLUMN IF NOT EXISTS priority VARCHAR(16),
+    ADD COLUMN IF NOT EXISTS queue_status VARCHAR(16),
+    ADD COLUMN IF NOT EXISTS queued_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS queue_started_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_knowledge_document_queue
+    ON t_knowledge_document (status, priority, queued_at);
+
+ALTER TABLE t_ingestion_task
+    ADD COLUMN IF NOT EXISTS file_url VARCHAR(1024),
+    ADD COLUMN IF NOT EXISTS file_size BIGINT,
+    ADD COLUMN IF NOT EXISTS mime_type VARCHAR(128),
+    ADD COLUMN IF NOT EXISTS priority VARCHAR(16),
+    ADD COLUMN IF NOT EXISTS queue_status VARCHAR(16),
+    ADD COLUMN IF NOT EXISTS queued_at TIMESTAMP,
+    ADD COLUMN IF NOT EXISTS queue_started_at TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_ingestion_task_queue
+    ON t_ingestion_task (status, priority, queued_at);

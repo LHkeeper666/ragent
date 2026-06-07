@@ -79,12 +79,27 @@ rag:
       max-wait-seconds: 5
       lease-seconds: 300
 
+  task-priority:
+    high:
+      max-file-count: 3
+      max-file-size: 1048576
+    low:
+      min-file-count: 20
+      min-file-size: 104857600
+    wait-estimate:
+      high-seconds-per-task: 5
+      medium-seconds-per-task: 30
+      low-seconds-per-task: 120
+
   knowledge:
     schedule:
       scan-delay-ms: 10000
       lock-seconds: 900
       batch-size: 20
       min-interval-seconds: 60
+
+  ingestion:
+    bucket-name: rag-ingestion
 
   mcp:
     servers:
@@ -104,31 +119,6 @@ rag:
     enabled: true
     max-error-length: 1000
 
-  websearch:
-    enabled: true       # 开启联网搜索增强
-    provider: tavily  # 默认，免费无需 API Key
-    api-key: ${TAVILY_API_KEY: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}
-    max-results: 5
-
-  eval:
-    enabled: true
-    sample-rate: 1
-    topic: rag-eval_topic${unique-name:}
-    default-model: qwen3-max
-    candidates:
-      - id: qwen-plus
-        provider: bailian
-        model: qwen
-        priority: 1
-      - id: qwen3-local
-        provider: ollama
-        model: qwen3:8b-fp16
-        priority: 2
-    metrics:
-      faithfulness: true
-      answer-relevancy: true
-      correctness: true
-
 ai:
   providers:
     ollama:
@@ -138,7 +128,7 @@ ai:
         embedding: /v1/embeddings
     bailian:
       url: https://dashscope.aliyuncs.com
-      api-key: ${BAILIAN_API_KEY:sk-644f7563d7e24747816ab79427514171}
+      api-key: ${BAILIAN_API_KEY:}
       endpoints:
         chat: /compatible-mode/v1/chat/completions
         rerank: /api/v1/services/rerank/text-rerank/text-rerank
@@ -150,7 +140,7 @@ ai:
         embedding: /v1/embeddings
     siliconflow:
       url: https://api.siliconflow.cn
-      api-key: ${SILICONFLOW_API_KEY:sk-avivdjiiaiwybxljrnmslljedsaezloacfnqpgmdxetepfng}
+      api-key: ${SILICONFLOW_API_KEY:}
       endpoints:
         chat: /v1/chat/completions
         embedding: /v1/embeddings
@@ -222,8 +212,8 @@ ai:
 
 rustfs:
   url: http://localhost:9000
-  access-key-id: ${RUSTFS_ACCESS_KEY:rustfsadmin}
-  secret-access-key: ${RUSTFS_SECRET_KEY:rustfsadmin}
+  access-key-id: rustfsadmin
+  secret-access-key: rustfsadmin
 
 sa-token:
   token-name: Authorization

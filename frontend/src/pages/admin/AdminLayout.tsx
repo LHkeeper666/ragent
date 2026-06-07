@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
+  Activity,
   ChevronDown,
   ChevronRight,
   ChevronsLeft,
@@ -71,10 +72,23 @@ const menuGroups: MenuGroup[] = [
     title: "导航",
     items: [
       {
+    id: "dashboard",
+    path: "/admin/dashboard",
+    label: "数据仪表盘",
+    icon: LayoutDashboard,
+    children: [
+      {
         path: "/admin/dashboard",
-        label: "Dashboard",
+        label: "综合概览",
         icon: LayoutDashboard
       },
+      {
+        path: "/admin/dashboard/quality",
+        label: "RAG 质量",
+        icon: Activity
+      }
+    ]
+  },
       {
         path: "/admin/knowledge",
         label: "知识库管理",
@@ -153,7 +167,8 @@ const menuGroups: MenuGroup[] = [
 ];
 
 const breadcrumbMap: Record<string, string> = {
-  dashboard: "Dashboard",
+  dashboard: "数据仪表盘",
+  quality: "RAG 质量",
   knowledge: "知识库管理",
   "intent-tree": "意图树配置",
   "intent-list": "意图列表",
@@ -178,7 +193,7 @@ export function AdminLayout() {
     confirmPassword: ""
   });
   const [starCount, setStarCount] = useState<number | null>(null);
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ ingestion: true, intent: true });
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ ingestion: true, intent: true, dashboard: true });
   const [kbQuery, setKbQuery] = useState("");
   const [kbOptions, setKbOptions] = useState<KnowledgeBase[]>([]);
   const [docOptions, setDocOptions] = useState<KnowledgeDocumentSearchItem[]>([]);
@@ -310,6 +325,11 @@ export function AdminLayout() {
       items.push({ label: "链路详情" });
     }
 
+    if (section === "dashboard" && segments.length > 2) {
+      const sub = segments[2];
+      items.push({ label: breadcrumbMap[sub] || sub });
+    }
+
     return items;
   }, [location.pathname, location.search]);
 
@@ -323,6 +343,7 @@ export function AdminLayout() {
     const text = String(rounded).replace(/\.0$/, "");
     return `${text}k`;
   }, [starCount]);
+  const isDashboardActive = location.pathname.startsWith("/admin/dashboard");
   const isIngestionActive = location.pathname.startsWith("/admin/ingestion");
   const isIntentActive =
     location.pathname.startsWith("/admin/intent-tree") || location.pathname.startsWith("/admin/intent-list");
@@ -330,10 +351,11 @@ export function AdminLayout() {
   useEffect(() => {
     setOpenGroups((prev) => ({
       ...prev,
+      dashboard: prev.dashboard || isDashboardActive,
       ingestion: prev.ingestion || isIngestionActive,
       intent: prev.intent || isIntentActive
     }));
-  }, [isIngestionActive, isIntentActive]);
+  }, [isDashboardActive, isIngestionActive, isIntentActive]);
 
   const handlePasswordSubmit = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword) {

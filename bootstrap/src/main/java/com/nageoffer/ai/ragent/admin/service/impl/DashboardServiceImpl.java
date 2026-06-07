@@ -19,19 +19,29 @@ package com.nageoffer.ai.ragent.admin.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.nageoffer.ai.ragent.admin.controller.vo.BlindSpotItem;
+import com.nageoffer.ai.ragent.admin.controller.vo.ChannelHitRateItem;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardCoverageVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardOverviewGroupVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardOverviewKpiVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardOverviewVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardPerformanceVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardRetrievalHitRateVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTopQuestionsVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTrendPointVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTrendSeriesVO;
 import com.nageoffer.ai.ragent.admin.controller.vo.DashboardTrendsVO;
+import com.nageoffer.ai.ragent.admin.controller.vo.TopQuestionItem;
 import com.nageoffer.ai.ragent.admin.service.DashboardService;
 import com.nageoffer.ai.ragent.rag.dao.entity.ConversationDO;
 import com.nageoffer.ai.ragent.rag.dao.entity.ConversationMessageDO;
+import com.nageoffer.ai.ragent.rag.dao.entity.MessageFeedbackDO;
+import com.nageoffer.ai.ragent.rag.dao.entity.RagTraceNodeDO;
 import com.nageoffer.ai.ragent.rag.dao.entity.RagTraceRunDO;
 import com.nageoffer.ai.ragent.rag.dao.mapper.ConversationMapper;
 import com.nageoffer.ai.ragent.rag.dao.mapper.ConversationMessageMapper;
+import com.nageoffer.ai.ragent.rag.dao.mapper.MessageFeedbackMapper;
+import com.nageoffer.ai.ragent.rag.dao.mapper.RagTraceNodeMapper;
 import com.nageoffer.ai.ragent.rag.dao.mapper.RagTraceRunMapper;
 import com.nageoffer.ai.ragent.user.dao.entity.UserDO;
 import com.nageoffer.ai.ragent.user.dao.mapper.UserMapper;
@@ -69,6 +79,8 @@ public class DashboardServiceImpl implements DashboardService {
     private final ConversationMapper conversationMapper;
     private final ConversationMessageMapper messageMapper;
     private final RagTraceRunMapper traceRunMapper;
+    private final RagTraceNodeMapper traceNodeMapper;
+    private final MessageFeedbackMapper feedbackMapper;
 
     @Override
     public DashboardOverviewVO loadOverview(String window) {
@@ -262,6 +274,252 @@ public class DashboardServiceImpl implements DashboardService {
                 .granularity(resolvedGranularity)
                 .series(series)
                 .build();
+    }
+
+    // ============================================================
+    // RAG Quality Dashboard
+    // ============================================================
+
+    private static final String NODE_TYPE_RETRIEVE_CHANNEL = "RETRIEVE_CHANNEL";
+
+    @Override
+    public DashboardRetrievalHitRateVO loadRetrievalHitRate(String window) {
+        WindowRange range = resolveWindowRange(window, Duration.ofHours(24));
+        ZoneId zoneId = ZoneId.systemDefault();
+
+        // Overall stats
+        long total = countRetrieveChannels(range.start, range.end, null);
+        long success = countRetrieveChannels(range.start, range.end, STATUS_SUCCESS);
+        long error = countRetrieveChannels(range.start, range.end, STATUS_ERROR);
+        double overallHitRate = total == 0 ? 0.0 : round1((success * 100.0) / total);
+
+        // Per-channel breakdown
+        List<ChannelHitRateItem> channels = buildChannelHitRates(range.start, range.end);
+
+        // Trend: hourly or daily
+        List<DashboardTrendPointVO> trend;
+        Duration windowDuration = parseWindow(window, Duration.ofHours(24));
+        if (windowDuration.toHours() <= 48) {
+            LocalDateTime endHourExclusive = toLocalDateTime(range.end, zoneId)
+                    .truncatedTo(ChronoUnit.HOURS)
+                    .plusHours(1);
+            LocalDateTime startHour = endHourExclusive.minusHours(Math.max(1, windowDuration.toHours()));
+            Map<LocalDateTime, Double> hourlyHitRate = hitRateByHour(startHour, endHourExclusive, zoneId);
+            trend = buildPointsDoubleByHour(startHour, endHourExclusive, zoneId, hourlyHitRate);
+        } else {
+            LocalDate startDay = toLocalDate(range.start, zoneId);
+            LocalDate endExclusiveDay = toLocalDate(range.end, zoneId).plusDays(1);
+            Map<LocalDate, Double> dailyHitRate = hitRateByDay(startDay, endExclusiveDay, zoneId);
+            trend = buildPointsDouble(startDay, endExclusiveDay, zoneId, dailyHitRate);
+        }
+
+        return DashboardRetrievalHitRateVO.builder()
+                .window(range.windowLabel)
+                .overallHitRate(overallHitRate)
+                .totalRetrievals(total)
+                .successRetrievals(success)
+                .channels(channels)
+                .trend(trend)
+                .build();
+    }
+
+    @Override
+    public DashboardCoverageVO loadCoverage(String window) {
+        WindowRange range = resolveWindowRange(window, Duration.ofHours(24));
+
+        long totalQuestions = countUserMessages(range.start, range.end);
+        long noDocQuestions = countNoDocMessages(range.start, range.end);
+        long retrievalErrorQuestions = countRetrieveErrorsByRun(range.start, range.end);
+        long coveredQuestions = totalQuestions - noDocQuestions - retrievalErrorQuestions;
+        double coverageRate = totalQuestions == 0 ? 0.0
+                : round1((coveredQuestions * 100.0) / (double) totalQuestions);
+
+        // Blind spots: most frequent user questions that got no-doc replies
+        List<BlindSpotItem> blindSpots = findBlindSpots(range.start, range.end, 10);
+
+        return DashboardCoverageVO.builder()
+                .window(range.windowLabel)
+                .totalQuestions(totalQuestions)
+                .coveredQuestions(Math.max(0, coveredQuestions))
+                .noDocQuestions(noDocQuestions)
+                .retrievalErrorQuestions(retrievalErrorQuestions)
+                .coverageRate(coverageRate)
+                .blindSpots(blindSpots)
+                .build();
+    }
+
+    @Override
+    public DashboardTopQuestionsVO loadTopQuestions(String window, Integer limit) {
+        WindowRange range = resolveWindowRange(window, Duration.ofHours(24));
+        int effectiveLimit = limit == null || limit < 1 ? 10 : Math.min(limit, 50);
+        List<TopQuestionItem> items = findTopQuestions(range.start, range.end, effectiveLimit);
+
+        return DashboardTopQuestionsVO.builder()
+                .window(range.windowLabel)
+                .items(items)
+                .build();
+    }
+
+    // ============================================================
+    // RAG Quality helper queries
+    // ============================================================
+
+    private long countRetrieveChannels(Date start, Date end, String status) {
+        QueryWrapper<RagTraceNodeDO> wrapper = new QueryWrapper<>();
+        wrapper.eq("node_type", NODE_TYPE_RETRIEVE_CHANNEL)
+                .ge("start_time", start)
+                .lt("start_time", end);
+        if (status != null) {
+            wrapper.eq("status", status);
+        }
+        return traceNodeMapper.selectCount(wrapper);
+    }
+
+    private List<ChannelHitRateItem> buildChannelHitRates(Date start, Date end) {
+        QueryWrapper<RagTraceNodeDO> wrapper = new QueryWrapper<>();
+        wrapper.select("node_name as channelName",
+                        "count(*) as total",
+                        "sum(case when status = 'SUCCESS' then 1 else 0 end) as success",
+                        "sum(case when status = 'ERROR' then 1 else 0 end) as error")
+                .eq("node_type", NODE_TYPE_RETRIEVE_CHANNEL)
+                .ge("start_time", start)
+                .lt("start_time", end)
+                .groupBy("node_name");
+        List<Map<String, Object>> rows = traceNodeMapper.selectMaps(wrapper);
+        List<ChannelHitRateItem> items = new ArrayList<>();
+        if (rows == null) {
+            return items;
+        }
+        for (Map<String, Object> row : rows) {
+            long total = toLongValue(row.get("total"));
+            long success = toLongValue(row.get("success"));
+            long error = toLongValue(row.get("error"));
+            double hitRate = total == 0 ? 0.0 : round1((success * 100.0) / total);
+            items.add(ChannelHitRateItem.builder()
+                    .channelName(String.valueOf(row.getOrDefault("channelname", "")))
+                    .total(total)
+                    .success(success)
+                    .error(error)
+                    .hitRate(hitRate)
+                    .build());
+        }
+        return items;
+    }
+
+    private Map<LocalDate, Double> hitRateByDay(LocalDate start, LocalDate endExclusive, ZoneId zoneId) {
+        QueryWrapper<RagTraceNodeDO> wrapper = new QueryWrapper<>();
+        wrapper.select("to_char(start_time,'YYYY-MM-DD') as d",
+                        "count(*) as total",
+                        "sum(case when status = 'SUCCESS' then 1 else 0 end) as success")
+                .eq("node_type", NODE_TYPE_RETRIEVE_CHANNEL)
+                .ge("start_time", toDate(start, zoneId))
+                .lt("start_time", toDate(endExclusive, zoneId))
+                .groupBy("d");
+        List<Map<String, Object>> rows = traceNodeMapper.selectMaps(wrapper);
+        Map<LocalDate, Double> result = new HashMap<>();
+        if (rows == null) {
+            return result;
+        }
+        for (Map<String, Object> row : rows) {
+            LocalDate date = parseLocalDate(row.get("d"));
+            if (date == null) {
+                continue;
+            }
+            long total = toLongValue(row.get("total"));
+            long success = toLongValue(row.get("success"));
+            result.put(date, total == 0 ? 0.0 : round1((success * 100.0) / total));
+        }
+        return result;
+    }
+
+    private Map<LocalDateTime, Double> hitRateByHour(LocalDateTime start, LocalDateTime endExclusive, ZoneId zoneId) {
+        QueryWrapper<RagTraceNodeDO> wrapper = new QueryWrapper<>();
+        wrapper.select("to_char(start_time,'YYYY-MM-DD HH24:00:00') as h",
+                        "count(*) as total",
+                        "sum(case when status = 'SUCCESS' then 1 else 0 end) as success")
+                .eq("node_type", NODE_TYPE_RETRIEVE_CHANNEL)
+                .ge("start_time", toDate(start, zoneId))
+                .lt("start_time", toDate(endExclusive, zoneId))
+                .groupBy("h");
+        List<Map<String, Object>> rows = traceNodeMapper.selectMaps(wrapper);
+        Map<LocalDateTime, Double> result = new HashMap<>();
+        if (rows == null) {
+            return result;
+        }
+        for (Map<String, Object> row : rows) {
+            LocalDateTime dateTime = parseLocalDateTime(row.get("h"));
+            if (dateTime == null) {
+                continue;
+            }
+            long total = toLongValue(row.get("total"));
+            long success = toLongValue(row.get("success"));
+            result.put(dateTime, total == 0 ? 0.0 : round1((success * 100.0) / total));
+        }
+        return result;
+    }
+
+    private long countUserMessages(Date start, Date end) {
+        QueryWrapper<ConversationMessageDO> wrapper = new QueryWrapper<>();
+        wrapper.eq("role", "user")
+                .ge("create_time", start)
+                .lt("create_time", end);
+        return messageMapper.selectCount(wrapper);
+    }
+
+    private long countRetrieveErrorsByRun(Date start, Date end) {
+        // Count trace runs where RETRIEVE_CHANNEL nodes had ERROR status,
+        // indicating the retrieval itself failed (distinct from no-doc responses)
+        QueryWrapper<RagTraceNodeDO> wrapper = new QueryWrapper<>();
+        wrapper.select("count(distinct trace_id) as cnt")
+                .eq("node_type", NODE_TYPE_RETRIEVE_CHANNEL)
+                .eq("status", STATUS_ERROR)
+                .ge("start_time", start)
+                .lt("start_time", end);
+        return extractCount(traceNodeMapper.selectMaps(wrapper));
+    }
+
+    private List<BlindSpotItem> findBlindSpots(Date start, Date end, int limit) {
+        List<Map<String, Object>> rows = messageMapper.findBlindSpots(start, end, NO_DOC_REPLY, limit);
+        List<BlindSpotItem> items = new ArrayList<>();
+        if (rows == null) {
+            return items;
+        }
+        for (Map<String, Object> row : rows) {
+            String question = String.valueOf(row.getOrDefault("question", ""));
+            long frequency = toLongValue(row.get("frequency"));
+            Date lastSeen = (Date) row.get("lastseen");
+            items.add(BlindSpotItem.builder()
+                    .question(question)
+                    .frequency(frequency)
+                    .lastSeen(lastSeen)
+                    .build());
+        }
+        return items;
+    }
+
+    private List<TopQuestionItem> findTopQuestions(Date start, Date end, int limit) {
+        List<Map<String, Object>> rows = messageMapper.findTopQuestions(start, end, limit, NO_DOC_REPLY);
+        List<TopQuestionItem> items = new ArrayList<>();
+        if (rows == null) {
+            return items;
+        }
+        for (Map<String, Object> row : rows) {
+            String question = String.valueOf(row.getOrDefault("question", ""));
+            long count = toLongValue(row.get("cnt"));
+            long hits = toLongValue(row.get("hits"));
+            double hitRate = count == 0 ? 0.0 : round1((hits * 100.0) / count);
+            long feedbackCount = toLongValue(row.get("feedbackcount"));
+            long thumbsUp = toLongValue(row.get("thumbsup"));
+            double thumbsUpRate = feedbackCount == 0 ? 0.0 : round1((thumbsUp * 100.0) / feedbackCount);
+            items.add(TopQuestionItem.builder()
+                    .question(question)
+                    .count(count)
+                    .hitRate(hitRate)
+                    .thumbsUpRate(thumbsUpRate)
+                    .feedbackCount(feedbackCount)
+                    .build());
+        }
+        return items;
     }
 
     private long countUsers(Date start, Date end) {

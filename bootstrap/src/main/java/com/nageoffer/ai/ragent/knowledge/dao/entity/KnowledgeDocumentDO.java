@@ -99,6 +99,26 @@ public class KnowledgeDocumentDO {
     private Long fileSize;
 
     /**
+     * priority: high / medium / low
+     */
+    private String priority;
+
+    /**
+     * queue status: queued / running / completed / failed
+     */
+    private String queueStatus;
+
+    /**
+     * enqueue time
+     */
+    private Date queuedAt;
+
+    /**
+     * actual queue execution start time
+     */
+    private Date queueStartedAt;
+
+    /**
      * 处理模式：chunk / pipeline
      * - chunk: 使用分块策略直接分块
      * - pipeline: 使用数据通道进行清洗处理
