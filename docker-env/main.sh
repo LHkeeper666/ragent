@@ -21,6 +21,12 @@ docker exec -i postgres psql -U postgres -d ragent < "$PROJECT_DIR/resources/dat
 echo "=== 导入初始数据 ==="
 docker exec -i postgres psql -U postgres -d ragent < "$PROJECT_DIR/resources/database/init_data_pg.sql"
 
+echo "=== 执行升级脚本 ==="
+for upgrade_sql in "$PROJECT_DIR"/resources/database/upgrade_v*.sql; do
+  echo "执行: $(basename "$upgrade_sql")"
+  docker exec -i postgres psql -U postgres -d ragent < "$upgrade_sql"
+done
+
 #echo "=== 等待 Ollama 就绪 ==="
 #until docker exec ollama ollama list 2>/dev/null; do
 #  sleep 2

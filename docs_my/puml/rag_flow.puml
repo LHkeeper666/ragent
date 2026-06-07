@@ -1,0 +1,43 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam activityBorderColor #4A90D9
+skinparam activityBackgroundColor #E8F0FE
+skinparam arrowColor #333333
+
+title Ragent AI RAG Execution Flow
+
+start
+
+:User Query;
+
+:QueryRewrite;
+
+:IntentTree Classification;
+
+if (Intent Type?) then (Non-Knowledge)
+    :MCP Tool Call;
+else (Knowledge)
+    :Multi-Channel Retrieval;
+    note right
+      VectorGlobalSearch
+      IntentDirectedSearch
+    end note
+
+    :Merge Channel Results;
+
+    :Deduplication;
+
+    :Rerank;
+
+    :ConversationMemory;
+
+    :Prompt Assembly;
+
+    :RoutingLLMService / SSE Streaming;
+endif
+
+:Return Answer;
+
+stop
+
+@enduml

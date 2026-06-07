@@ -1,0 +1,72 @@
+@startuml
+skinparam backgroundColor #FFFFFF
+skinparam classBorderColor #4A90D9
+skinparam classBackgroundColor #E8F0FE
+skinparam interfaceBorderColor #2D6A8A
+skinparam interfaceBackgroundColor #D4E8F0
+
+title Retrieval Module - Core Class Relationships
+
+interface SearchChannel {
+    + getName(): String
+    + getPriority(): int
+    + isEnabled(ctx): boolean
+    + search(ctx): SearchChannelResult
+    + getType(): SearchChannelType
+}
+
+interface SearchResultPostProcessor {
+    + getName(): String
+    + getOrder(): int
+    + isEnabled(ctx): boolean
+    + process(chunks, results, ctx): List
+}
+
+class MultiChannelRetrievalEngine {
+    - searchChannels
+    - postProcessors
+    - ragRetrievalExecutor
+    + retrieveKnowledgeChannels(...)
+    - executeSearchChannels(...)
+    - executePostProcessors(...)
+}
+
+class VectorGlobalSearchChannel {
+    + getName(): VectorGlobalSearch
+    + getPriority(): 10
+}
+
+class IntentDirectedSearchChannel {
+    + getName(): IntentDirectedSearch
+    + getPriority(): 1
+}
+
+class DeduplicationPostProcessor {
+    + getName(): Deduplication
+    + getOrder(): 10
+}
+
+class RerankPostProcessor {
+    + getName(): Rerank
+    + getOrder(): 20
+}
+
+enum SearchChannelType {
+    VECTOR_GLOBAL
+    INTENT_DIRECTED
+    KEYWORD_ES
+    HYBRID
+}
+
+MultiChannelRetrievalEngine --> SearchChannel : manages
+MultiChannelRetrievalEngine --> SearchResultPostProcessor : manages
+
+SearchChannel <|.. VectorGlobalSearchChannel
+SearchChannel <|.. IntentDirectedSearchChannel
+
+SearchResultPostProcessor <|.. DeduplicationPostProcessor
+SearchResultPostProcessor <|.. RerankPostProcessor
+
+SearchChannel ..> SearchChannelType : typed as
+
+@enduml
