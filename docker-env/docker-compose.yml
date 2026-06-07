@@ -3,7 +3,9 @@ name: ragent-middleware
 services:
   # ==================== PostgreSQL + pgvector ====================
   postgres:
-    image: pgvector/pgvector:pg16
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
     container_name: postgres
     ports:
       - "5432:5432"
