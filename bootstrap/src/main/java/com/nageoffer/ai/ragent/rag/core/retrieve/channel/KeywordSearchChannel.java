@@ -17,13 +17,13 @@
 
 package com.nageoffer.ai.ragent.rag.core.retrieve.channel;
 
-import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.nageoffer.ai.ragent.framework.convention.RetrievedChunk;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeBaseDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeBaseMapper;
 import com.nageoffer.ai.ragent.rag.config.SearchChannelProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -37,7 +37,7 @@ import java.util.concurrent.Executor;
 
 /**
  * 关键词全文检索通道
- * 使用 PostgreSQL tsvector/tsquery 进行关键词精确匹配检索，
+ * 使用 PostgreSQL tsvector/tsquery + zhparser 中文分词进行关键词匹配，
  * 弥补向量检索对专有名词、产品型号等精确关键词的召回不足。
  */
 @Slf4j
@@ -48,6 +48,7 @@ public class KeywordSearchChannel implements SearchChannel {
     private final SearchChannelProperties properties;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final JdbcTemplate jdbcTemplate;
+    @Qualifier("innerRetrievalExecutor")
     private final Executor innerRetrievalExecutor;
 
     public KeywordSearchChannel(SearchChannelProperties properties,
@@ -160,25 +161,28 @@ public class KeywordSearchChannel implements SearchChannel {
     }
 
     private List<RetrievedChunk> searchInCollection(String query, String collectionName, int topK) {
-        // 预处理查询：移除特殊字符避免 tsquery 解析错误
         String sanitized = query.replaceAll("[^\\w\\u4e00-\\u9fff\\s]", " ");
+        // 在中英文/数字交界处插入空格，避免 "Redis介绍" 被当成一个无法解析的 token
+        sanitized = sanitized.replaceAll(
+                "(?<=[\\u4e00-\\u9fff])(?=[a-zA-Z0-9])|(?<=[a-zA-Z0-9])(?=[\\u4e00-\\u9fff])", " ");
         if (sanitized.isBlank()) {
             return List.of();
         }
-        // plainto_tsquery 将输入切分为词后用 & 连接，sanitized 中的空格天然实现 AND 语义
-        // 使用带索引的 tsv 列而非实时计算 to_tsvector
+        // 将空格替换为 | 实现 OR 语义：匹配任一词即可命中
+        String tsQuery = sanitized.trim().replaceAll("\\s+", " | ");
+
         // noinspection SqlDialectInspection,SqlNoDataSourceInspection
         return jdbcTemplate.query(
-                "SELECT id, content, ts_rank(tsv, plainto_tsquery('zhparser', ?)) AS score " +
+                "SELECT id, content, ts_rank(tsv, to_tsquery('zhparser', ?)) AS score " +
                 "FROM t_knowledge_vector " +
-                "WHERE metadata->>'collection_name' = ? AND tsv @@ plainto_tsquery('zhparser', ?) " +
+                "WHERE metadata->>'collection_name' = ? AND tsv @@ to_tsquery('zhparser', ?) " +
                 "ORDER BY score DESC LIMIT ?",
                 (rs, rowNum) -> RetrievedChunk.builder()
                         .id(rs.getString("id"))
                         .text(rs.getString("content"))
                         .score(rs.getFloat("score"))
                         .build(),
-                sanitized, collectionName, sanitized, topK
+                tsQuery, collectionName, tsQuery, topK
         );
     }
 

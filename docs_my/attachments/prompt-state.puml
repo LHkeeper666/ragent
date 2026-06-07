@@ -1,0 +1,66 @@
+@startuml Prompt模板选择状态图
+skinparam backgroundColor #FEFEFE
+skinparam stateBorderColor #333333
+skinparam stateBackgroundColor #F8F8F8
+skinparam stateArrowColor #555555
+skinparam defaultFontSize 13
+
+[*] --> PromptContext
+
+state PromptContext {
+    [*] --> 判断场景
+
+    判断场景 --> KB_ONLY : !hasMcp() && hasKb()
+    判断场景 --> MCP_ONLY : hasMcp() && !hasKb()
+    判断场景 --> MIXED : hasMcp() && hasKb()
+    判断场景 --> EMPTY : 都为空
+
+    state KB_ONLY {
+        [*] --> 检查意图节点自定义模板
+        检查意图节点自定义模板 --> 自定义模板 : promptTemplate 不为空
+        检查意图节点自定义模板 --> 增强模式 : promptTemplate 为空\n且节点标记为增强模式
+        检查意图节点自定义模板 --> 默认KB模板 : promptTemplate 为空\n且节点未标记增强模式
+
+        自定义模板 --> 生成SystemPrompt : 使用节点级自定义模板
+        增强模式 --> 生成SystemPrompt : answer-chat-kb-augmented.st\n(本期新增 F-02)
+        默认KB模板 --> 生成SystemPrompt : answer-chat-kb.st
+    }
+
+    state MCP_ONLY {
+        [*] --> 检查MCP节点模板
+        检查MCP节点模板 --> MCP自定义 : 单意图 + promptTemplate 不为空
+        检查MCP节点模板 --> MCP默认 : 否则
+
+        MCP自定义 --> 生成SystemPrompt : 使用节点级自定义模板
+        MCP默认 --> 生成SystemPrompt : answer-chat-mcp.st
+    }
+
+    state MIXED {
+        [*] --> 混合处理
+        混合处理 --> 生成SystemPrompt : answer-chat-mcp-kb-mixed.st
+    }
+
+    state EMPTY {
+        [*] --> 兜底
+        兜底 --> 生成SystemPrompt : 空字符串\n(上层 fallback 处理)
+    }
+}
+
+生成SystemPrompt --> 组装消息 : PromptTemplateUtils.cleanupPrompt()
+组装消息 --> [*] : 返回 List<ChatMessage>
+
+note right of KB_ONLY
+  F-01/F-02 本期改造重点：
+  1. 意图节点新增 kind=KB_AUGMENTED
+  2. 新增增强回答模板
+  3. StreamChatPipeline 检索为空
+     时走增强模式而非兜底
+end note
+
+note right of MCP_ONLY
+  F-02 关联：
+  定制参数提取提示词
+  (paramPromptTemplate)
+end note
+
+@enduml

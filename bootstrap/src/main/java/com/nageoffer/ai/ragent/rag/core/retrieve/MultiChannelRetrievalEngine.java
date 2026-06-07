@@ -52,6 +52,7 @@ public class MultiChannelRetrievalEngine {
 
     private final List<SearchChannel> searchChannels;
     private final List<SearchResultPostProcessor> postProcessors;
+    @Qualifier("ragRetrievalExecutor")
     private final Executor ragRetrievalExecutor;
 
     /**

@@ -1,0 +1,174 @@
+@startuml 核心类图
+skinparam backgroundColor #FEFEFE
+skinparam classAttributeIconSize 0
+skinparam classBorderColor #333333
+skinparam classBackgroundColor #F8F8F8
+skinparam packageBackgroundColor #FAFAFA
+skinparam packageBorderColor #999999
+
+package "rag.core.intent" {
+    class IntentNode {
+        - id: String
+        - name: String
+        - description: String
+        - level: IntentLevel
+        - parentId: String
+        - kind: IntentKind (KB/MCP/SYSTEM)
+        - mcpToolId: String
+        - collectionName: String
+        - topK: Integer
+        - promptSnippet: String
+        - promptTemplate: String
+        - children: List<IntentNode>
+        --
+        + isLeaf(): boolean
+        + isKB(): boolean
+        + isMCP(): boolean
+        + isSystem(): boolean
+    }
+
+    enum IntentKind {
+        KB
+        SYSTEM
+        MCP
+    }
+
+    class IntentResolver {
+        + resolve(rewriteResult: RewriteResult): List<SubQuestionIntent>
+        + mergeIntentGroup(subIntents): IntentGroup
+        + isSystemOnly(nodeScores): boolean
+    }
+}
+
+package "rag.service.pipeline" {
+    class StreamChatPipeline {
+        - memoryService: ConversationMemoryService
+        - queryRewriteService: QueryRewriteService
+        - intentResolver: IntentResolver
+        - retrievalEngine: RetrievalEngine
+        - llmService: LLMService
+        - promptBuilder: RAGPromptService
+        --
+        + execute(ctx: StreamChatContext)
+        - loadMemory(ctx)
+        - rewriteQuery(ctx)
+        - resolveIntents(ctx)
+        - handleGuidance(ctx): boolean
+        - handleSystemOnly(ctx): boolean
+        - retrieve(ctx): RetrievalContext
+        - handleEmptyRetrieval(ctx): boolean
+    }
+}
+
+package "rag.core.retrieve" {
+    class RetrievalEngine {
+        - mcpParameterExtractor: McpParameterExtractor
+        - mcpToolRegistry: McpToolRegistry
+        - multiChannelRetrievalEngine: MultiChannelRetrievalEngine
+        --
+        + retrieve(subIntents, topK): RetrievalContext
+        - executeSingleMcpTool(question, intentNode): CallToolResult
+    }
+}
+
+package "rag.core.prompt" {
+    class RAGPromptService {
+        - templateLoader: PromptTemplateLoader
+        --
+        + buildSystemPrompt(context): String
+        + buildStructuredMessages(context, history, question, subQuestions): List<ChatMessage>
+        - plan(context): PromptBuildPlan
+        - planKbOnly(context): PromptBuildPlan
+        - planMcpOnly(context): PromptBuildPlan
+        - planMixed(context): PromptBuildPlan
+        - defaultTemplate(scene): String
+    }
+
+    class PromptTemplateLoader {
+        + load(templatePath): String
+        + render(templatePath, slots): String
+        + renderSection(formatPath, section, slots): String
+    }
+
+    class DefaultContextFormatter {
+        + formatKbContext(kbIntents, rerankedByIntent, topK): String
+        + formatMcpContext(toolResults, mcpIntents): String
+    }
+
+    class PromptContext {
+        - question: String
+        - mcpContext: String
+        - kbContext: String
+        - mcpIntents: List<NodeScore>
+        - kbIntents: List<NodeScore>
+        - intentChunks: Map
+        --
+        + hasMcp(): boolean
+        + hasKb(): boolean
+    }
+}
+
+package "rag.core.mcp" {
+    interface McpToolExecutor {
+        + getToolDefinition(): Tool
+        + execute(parameters: Map): CallToolResult
+    }
+
+    interface McpToolRegistry {
+        + register(executor: McpToolExecutor)
+        + getExecutor(toolId): Optional<McpToolExecutor>
+        + listAllTools(): List<Tool>
+    }
+}
+
+package "rag.service (本期新增 F-03)" #E8F5E9 {
+    class StatisticsService {
+        + getHitRate(kbId, intentType, dateRange): HitRateVO
+        + getCoverageReport(kbId, dateRange): CoverageVO
+        + getTopQuestions(kbId, intentType, dateRange, limit): List<QuestionRankVO>
+        + getUserActivity(dateRange): ActivityVO
+    }
+
+    class HitRateVO {
+        + kbName: String
+        + totalQueries: int
+        + hitQueries: int
+        + hitRate: double
+        + trends: List<DailyHitRate>
+    }
+
+    class CoverageVO {
+        + kbName: String
+        + coverageRate: double
+        + uncoveredTopics: List<String>
+    }
+
+    class QuestionRankVO {
+        + question: String
+        + count: int
+        + intentType: String
+    }
+
+    class ActivityVO {
+        + date: String
+        + queryCount: int
+        + activeUserCount: int
+    }
+}
+
+StreamChatPipeline --> IntentResolver
+StreamChatPipeline --> RetrievalEngine
+StreamChatPipeline --> RAGPromptService
+RetrievalEngine --> McpToolRegistry
+McpToolRegistry "1" *-- "*" McpToolExecutor
+RAGPromptService --> PromptTemplateLoader
+RAGPromptService --> PromptContext
+RAGPromptService --> DefaultContextFormatter
+IntentResolver ..> IntentNode
+RetrievalEngine ..> IntentNode
+StatisticsService ..> HitRateVO
+StatisticsService ..> CoverageVO
+StatisticsService ..> QuestionRankVO
+StatisticsService ..> ActivityVO
+
+@enduml

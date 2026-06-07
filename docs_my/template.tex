@@ -1,0 +1,173 @@
+% ==========================================================
+% 页面版式设置（纸张大小、页边距、页眉页脚间距）
+% ==========================================================
+\usepackage[
+  a4paper,           % A4 纸张
+  margin=2.5cm,      % 四周页边距
+  headheight=14pt,   % 页眉高度
+  headsep=10pt,      % 页眉与正文距离
+  footskip=35pt      % 页脚高度
+]{geometry}
+
+% ==========================================================
+% 表格相关宏包
+% ==========================================================
+\usepackage{longtable} % 跨页长表格
+\usepackage{array}     % 增强列格式
+\usepackage{booktabs}  % 三线表
+
+% ==========================================================
+% PDF 页面插入
+% ==========================================================
+\usepackage{pdfpages}  % 插入整页 PDF
+
+% ==========================================================
+% 正文字体大小与行距（推荐稳定版 + Markdown 列表兼容）
+% ==========================================================
+\fontsize{12pt}{22pt}\selectfont % 正文字号 12pt + 行距 22pt
+
+\usepackage{setspace}  % 用于 Markdown 列表行距控制
+% \setstretch{1.2}       % 正文 + 列表行距约 22~26pt
+\setstretch{1.5}
+
+% ==========================================================
+% 中文字体设置
+% ==========================================================
+\usepackage{xeCJK}
+\setCJKmainfont{SimSun}[BoldFont=SimHei, ItalicFont=KaiTi]    % 主字体
+\setCJKsansfont{Microsoft~YaHei}[BoldFont=*~Bold]             % 无衬线
+\setCJKmonofont{FangSong}                                      % 等宽字体
+
+% ==========================================================
+% 英文字体设置
+% ==========================================================
+\usepackage{fontspec}
+\setmainfont{Times New Roman}  % 英文正文字体
+\setmonofont{Consolas}         % 英文等宽字体（代码）
+
+% ==========================================================
+% 标题格式设置
+% ==========================================================
+\usepackage{titlesec}
+
+% 四级标题 (\paragraph)
+\titleformat{\paragraph}{\normalfont\normalsize\bfseries}{\theparagraph}{1em}{}
+\titlespacing*{\paragraph}{0pt}{1ex plus 0.5ex}{1ex}
+
+% 一级标题 (\section)
+\titleformat{\section}{\fontsize{16pt}{22pt}\selectfont\bfseries}{\thesection}{1em}{}
+\titlespacing{\section}{0pt}{13pt}{13pt}
+
+% 二级标题 (\subsection)，后三个参数分别是左缩进，标题前垂直间距，标题后垂直间距
+\titleformat{\subsection}{\fontsize{12pt}{18pt}\selectfont\bfseries}{\thesubsection}{1em}{}
+\titlespacing{\subsection}{0pt}{10pt}{10pt}
+
+% 三级标题 (\subsubsection)
+\titleformat{\subsubsection}{\fontsize{12pt}{16pt}\selectfont\bfseries}{\thesubsubsection}{1em}{}
+\titlespacing{\subsubsection}{0pt}{8pt}{4pt}
+
+% ==========================================================
+% 文档主标题 (\maketitle) 大小设置
+% ==========================================================
+% \makeatletter  % 允许使用 @ 命令
+% \renewcommand{\maketitle}{%
+%   \begin{center}%
+%     {\Huge\bfseries \@title\par}%
+%     \vspace{1em}%
+%     \ifx\@author\@empty\else
+%       {\Large \@author\par}%
+%     \fi
+%     \ifx\@date\@empty\else
+%       \vspace{0.5em}%
+%       {\large \@date\par}%
+%     \fi
+%   \end{center}%
+%   \vspace{2em}%
+%   \par\noindent% 确保退出垂直模式并开始正常段落
+% }
+% \makeatother   % 恢复 @ 的普通含义
+
+% ==========================================================
+% 目录与 PDF 书签
+% ==========================================================
+\usepackage[
+  bookmarks=true,
+  bookmarksopen=true,  % 展开书签
+  bookmarksdepth=3,
+  hidelinks,           % 隐藏链接边框
+  % 以下似乎没用
+  % colorlinks=true,     % 使用颜色标记链接，而不是边框（覆盖hidelinks）
+  % linkcolor=blue,      % 内部引用颜色
+  % citecolor=green,     % 引用文献颜色
+  % urlcolor=red,        % URL链接颜色
+  % linktoc=all,         % 目录也应用颜色，目录中的页码和标题都可点击（默认只标题可点）
+]{hyperref}
+
+% ==========================================================
+% 图片与浮动体设置
+% ==========================================================
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+
+\setlength{\intextsep}{18pt}        % 文中浮动体上下间距
+\setlength{\textfloatsep}{18pt}     % 页顶/页底浮动体与正文间距
+\setlength{\abovecaptionskip}{8pt}  % caption 上方间距
+\setlength{\belowcaptionskip}{8pt}  % caption 下方间距
+\captionsetup{skip=8pt}             % caption 与图像间距
+
+% --------------------------
+% 封面页不显示页码
+% --------------------------
+\usepackage{etoolbox}
+\AtBeginDocument{\thispagestyle{empty}}
+
+% ==========================================================
+% 页眉页脚设置
+% ==========================================================
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+% \fancyhead[L]{}                 % 左页眉
+% \fancyhead[R]{}     % 右页眉
+\fancyfoot[C]{第~\thepage~页}        % 页脚居中
+
+% ==========================================================
+% 列表层级与符号设置
+% ==========================================================
+\usepackage{enumitem}
+\setlistdepth{4}                         % 支持 4 层列表
+\setlist[itemize,1]{label=\textbullet, itemsep=6pt, topsep=6pt} 
+\setlist[itemize,2]{label=\textopenbullet, itemsep=4pt, topsep=4pt} 
+\setlist[itemize,3]{label=\(\triangleright\), itemsep=2pt, topsep=2pt} 
+\setlist[enumerate,1]{itemsep=6pt, topsep=6pt}
+\setlist[enumerate,2]{itemsep=4pt, topsep=4pt}
+\setlist[enumerate,3]{itemsep=2pt, topsep=2pt}
+
+% ==========================================================
+% 代码块显示设置（listings）
+% ==========================================================
+% \usepackage{listings}
+% \usepackage{xcolor}
+
+% \definecolor{codebg}{RGB}{240,240,240}  % 浅灰色背景
+
+% \lstset{
+%   backgroundcolor=\color{codebg},
+%   basicstyle=\ttfamily\small,
+%   breaklines=true,
+%   frame=single,
+%   frameround=tttt,
+%   numbers=left,
+%   numberstyle=\tiny\color{gray},
+%   keywordstyle=\color{blue},
+%   commentstyle=\color{green!60!black},
+%   stringstyle=\color{red!60!black},
+%   showstringspaces=false,
+%   xleftmargin=\parindent,  % 可以适当调整左侧边距
+%   linewidth=\textwidth  % 设置代码块宽度不超过页面宽度
+% }
+
+\usepackage{fvextra}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines, breakanywhere=true, commandchars=\\\{\}}
+\DefineVerbatimEnvironment{verbatim}{Verbatim}{breaklines, breakanywhere=true, commandchars=\\\{\}}

@@ -47,7 +47,7 @@ public class IntentDirectedSearchChannel implements SearchChannel {
 
     public IntentDirectedSearchChannel(RetrieverService retrieverService,
                                        SearchChannelProperties properties,
-                                       Executor innerRetrievalExecutor) {
+                                      @Qualifier("innerRetrievalExecutor") Executor innerRetrievalExecutor) {
         this.properties = properties;
         this.parallelRetriever = new IntentParallelRetriever(retrieverService, innerRetrievalExecutor);
     }

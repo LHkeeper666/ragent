@@ -35,6 +35,7 @@ public class DefaultConversationMemoryService implements ConversationMemoryServi
 
     private final ConversationMemoryStore memoryStore;
     private final ConversationMemorySummaryService summaryService;
+    @Qualifier("memoryLoadExecutor")
     private final Executor memoryLoadExecutor;
 
     public DefaultConversationMemoryService(ConversationMemoryStore memoryStore,

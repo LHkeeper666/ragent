@@ -1,0 +1,79 @@
+@startuml RAG问答核心链路
+skinparam backgroundColor #FEFEFE
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 10
+skinparam maxmessagesize 120
+
+actor 用户 as User
+participant "前端\n(React)" as Frontend
+participant "ChatController" as Controller
+participant "StreamChatPipeline" as Pipeline
+participant "ConversationMemoryService" as Memory
+participant "QueryRewriteService" as Rewrite
+participant "IntentResolver" as Intent
+participant "RetrievalEngine" as Retrieve
+participant "MultiChannelRetrievalEngine" as MultiRetrieve
+participant "McpToolExecutor" as Mcp
+participant "LLMMcpParameterExtractor" as ParamExtract
+participant "RAGPromptService" as Prompt
+participant "RoutingLLMService" as LLM
+
+User -> Frontend: 输入问题
+Frontend -> Controller: POST /api/ragent/rag/v3/chat (SSE)
+Controller -> Pipeline: execute(ctx)
+
+== 记忆与改写 ==
+Pipeline -> Memory: loadAndAppend(conversationId, userId, question)
+Memory --> Pipeline: history
+
+Pipeline -> Rewrite: rewriteWithSplit(question, history)
+Rewrite --> Pipeline: RewriteResult (rewrittenQuestion, subQuestions)
+
+== 意图识别 ==
+Pipeline -> Intent: resolve(rewriteResult)
+Intent --> Pipeline: List<SubQuestionIntent> (nodeScores)
+
+alt 意图置信度不足
+    Pipeline -> Frontend: 生成歧义引导选项
+    Frontend --> User: 请选择您想问的是...
+end
+
+== 检索 ==
+Pipeline -> Retrieve: retrieve(subIntents, topK)
+
+note over Retrieve, MultiRetrieve #FFFDE7: 以下两路检索并行执行\n(通过 ragContextExecutor 和 mcpBatchExecutor 线程池)
+
+Retrieve -> MultiRetrieve: retrieveKnowledgeChannels(subIntents, topK)
+MultiRetrieve --> Retrieve: List<RetrievedChunk>
+
+loop for each MCP intent
+    Retrieve -> ParamExtract: extractParameters(question, tool)
+    ParamExtract -> ParamExtract: LLM 提取参数
+    Retrieve -> Mcp: execute(params)
+    Mcp --> Retrieve: CallToolResult
+end
+
+Retrieve --> Pipeline: RetrievalContext (kbContext, mcpContext, intentChunks)
+
+alt 检索为空 && 非增强模式
+    Pipeline -> Frontend: "未检索到与问题相关的文档内容。"
+    Frontend --> User: 显示兜底消息
+else 增强回答模式 (F-01)
+    Pipeline -> Pipeline: 继续组装 Prompt，走增强模板
+end
+
+== Prompt 组装与生成 ==
+Pipeline -> Prompt: buildStructuredMessages(context, history, question)
+Prompt --> Pipeline: List<ChatMessage> (system + evidence + history + user)
+
+Pipeline -> LLM: streamChat(chatRequest, callback)
+
+loop SSE 流式输出
+    LLM --> Frontend: onContent(delta)
+    Frontend --> User: 实时渲染 Markdown
+end
+
+LLM --> Frontend: onComplete()
+Frontend --> User: 回答完成
+
+@enduml

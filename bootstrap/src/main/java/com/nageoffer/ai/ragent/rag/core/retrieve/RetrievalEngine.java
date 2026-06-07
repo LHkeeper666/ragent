@@ -38,6 +38,7 @@ import io.modelcontextprotocol.spec.McpSchema.TextContent;
 import io.modelcontextprotocol.spec.McpSchema.Tool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -67,7 +68,9 @@ public class RetrievalEngine {
     private final McpParameterExtractor mcpParameterExtractor;
     private final McpToolRegistry mcpToolRegistry;
     private final MultiChannelRetrievalEngine multiChannelRetrievalEngine;
+    @Qualifier("ragContextExecutor")
     private final Executor ragContextExecutor;
+    @Qualifier("mcpBatchExecutor")
     private final Executor mcpBatchExecutor;
 
     /**
