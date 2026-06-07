@@ -57,16 +57,19 @@ public class RoutingLLMService implements LLMService {
     private final ModelSelector selector;
     private final ModelHealthStore healthStore;
     private final ModelRoutingExecutor executor;
+    private final LlmFirstPacketProbe firstPacketProbe;
     private final Map<String, ChatClient> clientsByProvider;
 
     public RoutingLLMService(
             ModelSelector selector,
             ModelHealthStore healthStore,
             ModelRoutingExecutor executor,
+            LlmFirstPacketProbe firstPacketProbe,
             List<ChatClient> clients) {
         this.selector = selector;
         this.healthStore = healthStore;
         this.executor = executor;
+        this.firstPacketProbe = firstPacketProbe;
         this.clientsByProvider = clients.stream()
                 .collect(Collectors.toMap(ChatClient::provider, Function.identity()));
     }
@@ -166,7 +169,7 @@ public class RoutingLLMService implements LLMService {
                                                            StreamCancellationHandle handle,
                                                            StreamCallback callback) {
         try {
-            return bridge.awaitFirstPacket(FIRST_PACKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            return firstPacketProbe.awaitFirstPacket(bridge, FIRST_PACKET_TIMEOUT_SECONDS, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             handle.cancel();

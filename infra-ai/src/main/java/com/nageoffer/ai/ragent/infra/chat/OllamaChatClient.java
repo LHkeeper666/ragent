@@ -22,20 +22,11 @@ import com.nageoffer.ai.ragent.framework.trace.RagTraceNode;
 import com.nageoffer.ai.ragent.infra.enums.ModelProvider;
 import com.nageoffer.ai.ragent.infra.model.ModelTarget;
 import lombok.extern.slf4j.Slf4j;
-import okhttp3.OkHttpClient;
 import org.springframework.stereotype.Service;
-
-import java.util.concurrent.Executor;
 
 @Slf4j
 @Service
 public class OllamaChatClient extends AbstractOpenAIStyleChatClient {
-
-    public OllamaChatClient(OkHttpClient syncHttpClient,
-                            OkHttpClient streamingHttpClient,
-                            Executor modelStreamExecutor) {
-        super(syncHttpClient, streamingHttpClient, modelStreamExecutor);
-    }
 
     @Override
     public String provider() {
@@ -54,7 +45,6 @@ public class OllamaChatClient extends AbstractOpenAIStyleChatClient {
     }
 
     @Override
-    @RagTraceNode(name = "ollama-stream-chat", type = "LLM_PROVIDER")
     public StreamCancellationHandle streamChat(ChatRequest request, StreamCallback callback, ModelTarget target) {
         return doStreamChat(request, callback, target);
     }

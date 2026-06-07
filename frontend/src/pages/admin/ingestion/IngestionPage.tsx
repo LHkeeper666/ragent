@@ -47,6 +47,7 @@ import {
 } from "@/services/ingestionService";
 import { getSystemSettings } from "@/services/settingsService";
 import { getErrorMessage } from "@/utils/error";
+import { RelativeTime } from "@/components/RelativeTime";
 const PIPELINE_PAGE_SIZE = 10;
 const TASK_PAGE_SIZE = 10;
 
@@ -431,7 +432,7 @@ export function IngestionPage() {
                       </TableCell>
                       <TableCell>{pipeline.nodes?.length ?? 0}</TableCell>
                       <TableCell>{pipeline.createdBy || "-"}</TableCell>
-                      <TableCell>{formatDate(pipeline.updateTime)}</TableCell>
+                      <TableCell><RelativeTime value={pipeline.updateTime} /></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button size="sm" variant="outline" onClick={() => openPipelineNodes(pipeline)}>
@@ -554,7 +555,7 @@ export function IngestionPage() {
                       </TableCell>
                       <TableCell>{task.createdBy || "-"}</TableCell>
                       <TableCell>{task.chunkCount ?? "-"}</TableCell>
-                      <TableCell>{formatDate(task.createTime)}</TableCell>
+                      <TableCell><RelativeTime value={task.createTime} /></TableCell>
                       <TableCell className="text-right">
                         <Button size="sm" variant="outline" onClick={() => setTaskDetail({ open: true, taskId: task.id })}>
                           查看详情

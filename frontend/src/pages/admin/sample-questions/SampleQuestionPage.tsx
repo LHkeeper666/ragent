@@ -33,6 +33,7 @@ import {
   updateSampleQuestion
 } from "@/services/sampleQuestionService";
 import { getErrorMessage } from "@/utils/error";
+import { RelativeTime } from "@/components/RelativeTime";
 
 const PAGE_SIZE = 10;
 
@@ -88,11 +89,6 @@ export function SampleQuestionPage() {
     }
     setForm(emptyForm);
   }, [dialogState]);
-
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleString("zh-CN");
-  };
 
   const handleSearch = () => {
     setPageNo(1);
@@ -221,7 +217,7 @@ export function SampleQuestionPage() {
                       {item.question}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {formatDate(item.updateTime || item.createTime)}
+                      <RelativeTime value={item.updateTime || item.createTime} />
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-end gap-2">

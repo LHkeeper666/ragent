@@ -60,7 +60,7 @@ rag:
   rate-limit:
     global:
       enabled: true
-      max-concurrent: 1
+      max-concurrent: 10
       max-wait-seconds: 15
       lease-seconds: 30
       poll-interval-ms: 200
@@ -123,6 +123,12 @@ ai:
       endpoints:
         chat: /compatible-mode/v1/chat/completions
         rerank: /api/v1/services/rerank/text-rerank/text-rerank
+    aihubmix:
+      url: https://aihubmix.com
+      api-key: ${AIHUBMIX_API_KEY:}
+      endpoints:
+        chat: /v1/chat/completions
+        embedding: /v1/embeddings
     siliconflow:
       url: https://api.siliconflow.cn
       api-key: ${SILICONFLOW_API_KEY:}
@@ -145,6 +151,10 @@ ai:
         provider: bailian
         model: qwen-plus-latest
         priority: 1
+      - id: qwen3-local
+        provider: ollama
+        model: qwen3:8b-fp16
+        priority: 2
       - id: qwen3-max
         provider: bailian
         model: qwen3-max
@@ -154,11 +164,11 @@ ai:
         provider: siliconflow
         model: Pro/zai-org/GLM-4.7
         supports-thinking: true
-        priority: 0
-      - id: qwen3-local
-        provider: ollama
-        model: qwen3:8b-fp16
-        priority: 2
+        priority: 4
+      - id: gpt-5.4
+        provider: aihubmix
+        model: gpt-5.4
+        priority: 5
 
   embedding:
     default-model: qwen-emb-8b
@@ -173,6 +183,11 @@ ai:
         model: qwen3-embedding:8b-fp16
         dimension: ${rag.default.dimension}
         priority: 2
+      - id: text-embedding-3-large
+        provider: aihubmix
+        model: text-embedding-3-large
+        dimension: ${rag.default.dimension}
+        priority: 3
 
   rerank:
     default-model: qwen3-rerank
@@ -202,3 +217,5 @@ sa-token:
 
 app:
   demo-mode: false
+  eval:
+    enabled: true

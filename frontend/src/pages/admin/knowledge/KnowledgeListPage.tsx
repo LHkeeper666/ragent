@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { RelativeTime } from "@/components/RelativeTime";
 import {
   Table,
   TableBody,
@@ -187,11 +188,6 @@ export function KnowledgeListPage() {
     }
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleString("zh-CN");
-  };
-
   const formatStatValue = (value: number) => {
     if (statsLoading) return "--";
     return value.toLocaleString("zh-CN");
@@ -350,11 +346,11 @@ export function KnowledgeListPage() {
                     </TableCell>
                     <TableCell>{kb.documentCount ?? "-"}</TableCell>
                     <TableCell>{kb.createdBy || "-"}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(kb.createTime)}
+                    <TableCell>
+                      <RelativeTime value={kb.createTime} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(kb.updateTime)}
+                    <TableCell>
+                      <RelativeTime value={kb.updateTime} />
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">

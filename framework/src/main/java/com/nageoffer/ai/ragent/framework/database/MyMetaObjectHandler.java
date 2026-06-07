@@ -36,6 +36,6 @@ public class MyMetaObjectHandler implements MetaObjectHandler {
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        strictUpdateFill(metaObject, "updateTime", Date::new, Date.class);
+        this.setFieldValByName("updateTime", new Date(), metaObject);
     }
 }

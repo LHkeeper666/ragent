@@ -40,6 +40,7 @@ import {
   updateQueryTermMapping
 } from "@/services/queryTermMappingService";
 import { getErrorMessage } from "@/utils/error";
+import { RelativeTime } from "@/components/RelativeTime";
 
 const PAGE_SIZE = 10;
 
@@ -112,11 +113,6 @@ export function QueryTermMappingPage() {
     }
     setForm(emptyForm);
   }, [dialogState]);
-
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleString("zh-CN");
-  };
 
   const handleSearch = () => {
     setPageNo(1);
@@ -265,11 +261,11 @@ export function QueryTermMappingPage() {
                     <TableCell className="max-w-[160px] truncate text-muted-foreground" title={item.remark || ""}>
                       {item.remark || "-"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(item.createTime)}
+                    <TableCell>
+                      <RelativeTime value={item.createTime} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(item.updateTime)}
+                    <TableCell>
+                      <RelativeTime value={item.updateTime} />
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex justify-center gap-2">

@@ -22,6 +22,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -55,9 +56,11 @@ import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentChunkLog
 import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentSearchVO;
 import com.nageoffer.ai.ragent.knowledge.controller.vo.KnowledgeDocumentVO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeBaseDO;
+import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeChunkDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentChunkLogDO;
 import com.nageoffer.ai.ragent.knowledge.dao.entity.KnowledgeDocumentDO;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeBaseMapper;
+import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeChunkMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentChunkLogMapper;
 import com.nageoffer.ai.ragent.knowledge.dao.mapper.KnowledgeDocumentMapper;
 import com.nageoffer.ai.ragent.knowledge.enums.DocumentStatus;
@@ -90,6 +93,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -110,6 +114,7 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
     private final IngestionEngine ingestionEngine;
     private final ChunkEmbeddingService chunkEmbeddingService;
     private final KnowledgeDocumentChunkLogMapper chunkLogMapper;
+    private final KnowledgeChunkMapper chunkMapper;
     private final TransactionOperations transactionOperations;
     private final MessageQueueProducer messageQueueProducer;
     private final KnowledgeScheduleProperties scheduleProperties;
@@ -538,8 +543,29 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
                 .eq(requestParam.getStatus() != null && !requestParam.getStatus().isBlank(), KnowledgeDocumentDO::getStatus, requestParam.getStatus())
                 .orderByDesc(KnowledgeDocumentDO::getCreateTime);
 
-        return documentMapper.selectPage(pageParam, queryWrapper)
+        IPage<KnowledgeDocumentVO> result = documentMapper.selectPage(pageParam, queryWrapper)
                 .convert(each -> BeanUtil.toBean(each, KnowledgeDocumentVO.class));
+
+        List<String> docIds = result.getRecords().stream()
+                .map(KnowledgeDocumentVO::getId)
+                .collect(Collectors.toList());
+        Set<String> editedDocIds = findEditedDocIds(docIds);
+        result.getRecords().forEach(vo -> vo.setChunksEdited(editedDocIds.contains(vo.getId())));
+
+        return result;
+    }
+
+    private Set<String> findEditedDocIds(List<String> docIds) {
+        if (docIds == null || docIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        QueryWrapper<KnowledgeChunkDO> wrapper = new QueryWrapper<>();
+        wrapper.select("DISTINCT doc_id")
+                .in("doc_id", docIds)
+                .apply("update_time > create_time + INTERVAL '1 second'");
+        return chunkMapper.selectObjs(wrapper).stream()
+                .map(String::valueOf)
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -790,6 +816,22 @@ public class KnowledgeDocumentServiceImpl implements KnowledgeDocumentService {
         } catch (Exception e) {
             log.warn("分块参数解析失败: {}", json, e);
             return Map.of();
+        }
+    }
+
+    @Override
+    public String preview(String docId) {
+        KnowledgeDocumentDO documentDO = documentMapper.selectById(docId);
+        Assert.notNull(documentDO, () -> new ClientException("文档不存在"));
+        if (!"markdown".equalsIgnoreCase(documentDO.getFileType())) {
+            throw new ClientException("仅支持预览 markdown 格式文档");
+        }
+        try (InputStream in = fileStorageService.openStream(documentDO.getFileUrl())) {
+            return new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (ClientException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ClientException("读取文档内容失败: " + e.getMessage());
         }
     }
 

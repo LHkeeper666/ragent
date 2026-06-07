@@ -91,6 +91,62 @@ export const clamp = (value: number, min: number, max: number): number => {
   return Math.min(max, Math.max(min, value));
 };
 
+export const nodeTypeChipClass = (type?: string | null): string => {
+  const normalized = (type || "").trim().toUpperCase();
+  if (normalized === "ROOT") return "bg-indigo-100 text-indigo-700";
+  if (normalized === "USER_TTFT") return "bg-rose-100 text-rose-700";
+  if (normalized === "LLM_TTFT") return "bg-emerald-100 text-emerald-700";
+  if (normalized === "LLM_PROVIDER") return "bg-orange-100 text-orange-700";
+  if (normalized === "LLM_ROUTING") return "bg-amber-100 text-amber-700";
+  if (normalized === "GUIDANCE") return "bg-violet-100 text-violet-700";
+  if (normalized === "INTENT") return "bg-sky-100 text-sky-700";
+  if (normalized === "REWRITE") return "bg-teal-100 text-teal-700";
+  if (normalized === "RETRIEVE" || normalized === "RAG_NODE") return "bg-blue-100 text-blue-700";
+  if (normalized === "TITLE_GEN") return "bg-stone-100 text-stone-700";
+  if (normalized.startsWith("MCP")) return "bg-cyan-100 text-cyan-700";
+  return "bg-slate-100 text-slate-600";
+};
+
+const NODE_NAME_DISPLAY: Record<string, string> = {
+  "rag-stream-chat": "RAG 流式对话",
+  "user-first-packet": "用户感知首包",
+  "llm-first-packet": "LLM 首包",
+  "llm-chat-routing": "LLM 路由调度",
+  "bailian-chat": "百炼 · 同步",
+  "bailian-stream-chat": "百炼 · 流式",
+  "ollama-chat": "Ollama · 同步",
+  "ollama-stream-chat": "Ollama · 流式",
+  "siliconflow-chat": "硅基流动 · 同步",
+  "siliconflow-stream-chat": "硅基流动 · 流式",
+  "aihubmix-chat": "AIHubMix · 同步",
+  "aihubmix-stream-chat": "AIHubMix · 流式",
+  "query-rewrite-and-split": "问题改写与拆分",
+  "intent-resolve": "意图识别",
+  "guidance-detect": "歧义引导",
+  "retrieval-engine": "知识库检索",
+  "multi-channel-retrieval": "多路召回",
+  "context-build": "上下文组装",
+  "prompt-render": "Prompt 渲染",
+  "conversation-title-gen": "会话标题生成",
+  "llm-stream-routing": "LLM 流式路由"
+};
+
+const toTitleCase = (raw: string): string =>
+    raw
+        .split(/[-_\s]+/)
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+
+export const prettifyNodeName = (name?: string | null): string => {
+  if (!name) return "-";
+  const trimmed = name.trim();
+  if (!trimmed) return "-";
+  const mapped = NODE_NAME_DISPLAY[trimmed];
+  if (mapped) return mapped;
+  return toTitleCase(trimmed);
+};
+
 export const resolveNodeDuration = (node: RagTraceNode): number => {
   const durationMs = Number(node.durationMs ?? 0);
   if (Number.isFinite(durationMs) && durationMs > 0) return durationMs;
