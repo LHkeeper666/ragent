@@ -64,7 +64,9 @@ public interface IngestionTaskService {
      * @param status 状态筛选
      * @return 分页结果
      */
-    IPage<IngestionTaskVO> page(Page<IngestionTaskVO> page, String status);
+    IPage<IngestionTaskVO> page(Page<IngestionTaskVO> page, String status, String priority);
+
+    void executeQueued(String taskId);
 
     /**
      * 获取任务节点列表

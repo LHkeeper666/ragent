@@ -91,7 +91,8 @@ public class IngestionTaskController {
     @GetMapping("/ingestion/tasks")
     public Result<IPage<IngestionTaskVO>> page(@RequestParam(value = "pageNo", defaultValue = "1") int pageNo,
                                                @RequestParam(value = "pageSize", defaultValue = "10") int pageSize,
-                                               @RequestParam(value = "status", required = false) String status) {
-        return Results.success(taskService.page(new Page<>(pageNo, pageSize), status));
+                                               @RequestParam(value = "status", required = false) String status,
+                                               @RequestParam(value = "priority", required = false) String priority) {
+        return Results.success(taskService.page(new Page<>(pageNo, pageSize), status, priority));
     }
 }
